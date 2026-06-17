@@ -1,0 +1,7 @@
+name=PZ Community Rank
+id=PZCommunityRank
+description=Gera um arquivo com seus dados de sobrevivência ao morrer. Envie o arquivo no site do ranking da comunidade para registrar seu resultado. Sem necessidade de internet ou configuração.
+url=
+modversion=1.3.0
+pzversion=42.19+
+poster=poster.png
