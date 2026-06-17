@@ -95,6 +95,11 @@ function RankData.minutesToYDHM(minutes)
 end
 
 local function getCharacterName(player)
+    if type(player.getDescriptor) ~= "function" then
+        local userOk, username = pcall(function() return player:getUsername() end)
+        if userOk and username and username ~= "" then return username end
+        return "Sobrevivente"
+    end
     local descOk, desc = pcall(function() return player:getDescriptor() end)
     if descOk and desc then
         local foreOk, forename = pcall(function() return desc:getForename() end)
@@ -116,6 +121,7 @@ end
 -- Ambos os erros são logados pelo PZ mesmo quando capturados por pcall.
 -- A verificação type(desc.X) == "function" garante que só chamamos o que existe.
 local function getProfessionName(player)
+    if type(player.getDescriptor) ~= "function" then return "Desconhecida" end
     local ok, desc = pcall(function() return player:getDescriptor() end)
     if not ok or not desc then return "Desconhecida" end
 

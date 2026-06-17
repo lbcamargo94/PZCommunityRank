@@ -38,13 +38,14 @@ end
 function RankSubmitUI:new(entry, code, playerIndex)
     playerIndex = playerIndex or 0
 
-    local screenW = getPlayerScreenWidth(playerIndex)
-    local screenH = getPlayerScreenHeight(playerIndex)
-    local screenX = getPlayerScreenLeft(playerIndex)
-    local screenY = getPlayerScreenTop(playerIndex)
+    -- getPlayerScreenWidth/Height retornam 0 para o slot de jogador morto no B42.19,
+    -- posicionando o painel em coordenadas negativas (fora da tela).
+    -- getCore():getScreenWidth/Height() sempre retorna as dimensões reais da janela.
+    local screenW = getCore():getScreenWidth()
+    local screenH = getCore():getScreenHeight()
 
-    local x = screenX + (screenW / 2) - (W / 2)
-    local y = screenY + (screenH / 2) - (H / 2)
+    local x = (screenW / 2) - (W / 2)
+    local y = (screenH / 2) - (H / 2)
 
     local o = ISPanel.new(self, x, y, W, H)
     o.entry       = entry
