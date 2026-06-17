@@ -64,22 +64,30 @@ local function onPlayerDeath(player, playerIndex)
 
     RankLog.info("OnPlayerDeath recebido para o jogador local, playerIndex=" .. playerIndex)
 
+    -- Morte sempre deve abrir a janela, mesmo que o jogador tenha usado o menu
+    -- de contexto antes de morrer (que teria deixado submitted=true).
+    RankMain.submitted[playerIndex] = false
+
     -- Captura a referência do player ANTES da morte ser processada.
     -- Não re-obtém via getSpecificPlayer() pois o slot pode ser nil após a morte.
     local capturedPlayer = player
     local capturedIndex  = playerIndex
-    local ticks  = 0
-    local TARGET = 90  -- ~1.5s a 60fps para a tela de morte aparecer primeiro
+    local frames = 0
+    -- Events.OnPreUI dispara no loop de render (sempre ativo, mesmo durante a tela
+    -- de morte). Events.OnTick dispara no loop de lógica, que fica pausado no B42.19
+    -- enquanto a death screen está ativa — por isso o counter nunca chegava a 90.
+    local TARGET = 60  -- ~1s a 60fps; dá tempo da tela de morte aparecer primeiro
 
-    local function waitTick()
-        ticks = ticks + 1
-        if ticks >= TARGET then
-            Events.OnTick.Remove(waitTick)
+    local waitFrame
+    waitFrame = function()
+        frames = frames + 1
+        if frames >= TARGET then
+            Events.OnPreUI.Remove(waitFrame)
             triggerRank(capturedPlayer, capturedIndex, true)
         end
     end
 
-    Events.OnTick.Add(waitTick)
+    Events.OnPreUI.Add(waitFrame)
 end
 
 -- ── Resetar controle ao iniciar nova partida ────────────────
