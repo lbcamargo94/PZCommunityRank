@@ -6,6 +6,7 @@ require "RankMod/RankLog"
 require "RankMod/RankData"
 require "RankMod/RankCode"
 require "RankMod/RankUI"
+require "RankMod/RankFile"
 
 RankMain = {}
 RankMain.submitted = {}
@@ -38,6 +39,7 @@ local function triggerRank(player, playerIndex, isDead)
         return
     end
 
+    RankFile.save(entry, code)
     RankSubmitUI.open(entry, code, playerIndex)
 end
 
