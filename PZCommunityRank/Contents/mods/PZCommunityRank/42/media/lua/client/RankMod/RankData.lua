@@ -108,45 +108,45 @@ local function getCharacterName(player)
     return "Sobrevivente"
 end
 
--- B42.19 renomeou getProfession() para getOccupation(). A API antiga gerava
--- RuntimeException que escapava do pcall. A nova API retorna String ou objeto
--- Lua nativo, ambos seguros. Tentamos múltiplos caminhos com fallbacks.
+-- Tentativa de obter a profissão via métodos do descriptor.
+-- REGRA: NUNCA chamar um método sem verificar existência antes.
+-- Em B42.19 o bridge Kahlua NÃO registra todos os métodos Java:
+--   • getProfession()  → lança RuntimeException (tipo não mapeado)
+--   • getOccupation()  → nil no bridge → "Tried to call nil" (também logado pelo PZ)
+-- Ambos os erros são logados pelo PZ mesmo quando capturados por pcall.
+-- A verificação type(desc.X) == "function" garante que só chamamos o que existe.
 local function getProfessionName(player)
     local ok, desc = pcall(function() return player:getDescriptor() end)
     if not ok or not desc then return "Desconhecida" end
 
-    -- B42.19: getOccupation() substitui getProfession()
-    local ok2, occ = pcall(function() return desc:getOccupation() end)
-    if ok2 and occ ~= nil then
-        if type(occ) == "string" and occ ~= "" then
-            return occ
-        end
-        if type(occ) == "table" then
-            return occ.Name or occ.name or occ.type or "Desconhecida"
-        end
-        -- Objeto Java mapeado: tenta métodos seguros de string.
-        -- O índice occ[m] e a chamada ficam ambos dentro do pcall porque
-        -- indexar um userdata não registrado no Kahlua também pode lançar exceção.
-        local nameMethods = {"getName", "getType", "getId"}
-        for _, m in ipairs(nameMethods) do
-            local ok3, v = pcall(function()
-                local fn = occ[m]
-                if type(fn) == "function" then return fn(occ) end
-            end)
-            if ok3 and type(v) == "string" and v ~= "" and not v:find("@") then
-                return v
+    -- Tenta getOccupation() apenas se o bridge expõe o método.
+    -- Se retornar String ou tabela Lua, usa diretamente.
+    -- Se retornar userdata Java, tenta extrair nome via métodos seguros.
+    if type(desc.getOccupation) == "function" then
+        local ok2, occ = pcall(function() return desc:getOccupation() end)
+        if ok2 and occ ~= nil then
+            if type(occ) == "string" and occ ~= "" then return occ end
+            if type(occ) == "table" then
+                return occ.Name or occ.name or occ.type or "Desconhecida"
+            end
+            -- userdata: índice e chamada dentro do mesmo pcall
+            for _, m in ipairs({"getName", "getType", "getId"}) do
+                local ok3, v = pcall(function()
+                    local fn = occ[m]
+                    if type(fn) == "function" then return fn(occ) end
+                end)
+                if ok3 and type(v) == "string" and v ~= "" and not v:find("@") then
+                    return v
+                end
             end
         end
     end
 
-    -- Fallback: métodos diretos no descriptor que retornam String
-    local descStringMethods = {"getProfessionName", "getOccupationName", "getOccupationType"}
-    for _, m in ipairs(descStringMethods) do
+    -- Fallback: métodos que retornam String diretamente no descriptor
+    for _, m in ipairs({"getProfessionName", "getOccupationName", "getOccupationType"}) do
         if type(desc[m]) == "function" then
-            local ok4, v = pcall(function() return desc[m](desc) end)
-            if ok4 and type(v) == "string" and v ~= "" then
-                return v
-            end
+            local ok2, v = pcall(function() return desc[m](desc) end)
+            if ok2 and type(v) == "string" and v ~= "" then return v end
         end
     end
 
