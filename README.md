@@ -66,11 +66,15 @@ PZCommunityRank/
 
 ## Formato do código de submissão
 
-O código gerado segue o formato `PZRX1:<dados_codificados>`, onde os dados são codificados com XOR + Base64. A obfuscação é intencionalmente leve para garantir transparência — o objetivo é dificultar edições manuais, não esconder informações.
+A partir da **v1.4.0**, o código gerado segue o formato `PZRX2:<dados_codificados>` (7 campos). O prefixo `PZRX1:` era o formato legado com 6 campos (sem o campo de status). O site (`src/app.ts`) deve verificar o prefixo para selecionar o parser correto.
+
+Campos (formato `PZRX2:`): `PZR|nome|profissão|kills|minutos|habilidades|status`
+
+Os dados são codificados com XOR + Base64. A obfuscação é intencionalmente leve — o objetivo é dificultar edições manuais, não esconder informações.
 
 ## Versão
 
-**1.3.0** — compatível com Project Zomboid 42.19+
+**1.4.0** — compatível com Project Zomboid 42.19+
 
 ## Licença
 
