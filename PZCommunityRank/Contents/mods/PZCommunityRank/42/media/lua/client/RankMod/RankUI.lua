@@ -61,7 +61,7 @@ function RankSubmitUI:initialise()
 
     -- ── Linha: campo do código + botão selecionar ─────────────
     local boxW = iW - BTN_W - 6
-    self.codeBox = ISTextEntryBox:new(self.code or "", PAD, PAD, boxW, ROW_H, self, false)
+    self.codeBox = ISTextEntryBox:new(self.code or "", PAD, PAD, boxW, ROW_H, self, nil)
     self.codeBox:initialise(); self:addChild(self.codeBox)
 
     self.btnSelect = ISButton:new(PAD + boxW + 6, PAD, BTN_W, ROW_H,

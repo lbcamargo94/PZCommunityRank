@@ -160,8 +160,7 @@ local function getProfessionName(player)
 end
 
 local function getWeightStr(player)
-    -- Verificação de existência via dot-notation (retorna nil se não existe, não lança erro).
-    if not player.getNutrition then return "?" end
+    if type(player.getNutrition) ~= "function" then return "?" end
     local ok, w = pcall(function() return player:getNutrition():getWeight() end)
     if ok and type(w) == "number" then
         return string.format("%.1f Kg", w):gsub("%.", ",")
