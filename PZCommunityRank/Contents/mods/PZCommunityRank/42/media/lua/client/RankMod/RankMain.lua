@@ -10,8 +10,9 @@ require "RankMod/RankUI"
 RankMain = {}
 RankMain.submitted = {}
 
--- Coleta dados, gera código e abre a UI
-local function triggerRank(player, playerIndex)
+-- Coleta dados, gera código e abre a UI.
+-- isDead: true quando chamado do evento de morte, false/nil para trigger manual.
+local function triggerRank(player, playerIndex, isDead)
     playerIndex = playerIndex or 0
 
     if RankMain.submitted[playerIndex] then
@@ -20,11 +21,12 @@ local function triggerRank(player, playerIndex)
     end
     RankMain.submitted[playerIndex] = true
 
-    RankLog.info("triggerRank iniciado para playerIndex=" .. playerIndex)
+    RankLog.info("triggerRank iniciado para playerIndex=" .. playerIndex .. " isDead=" .. tostring(isDead))
 
-    local entry = RankData.collect(player)
+    local entry = RankData.collect(player, isDead)
     if not entry then
         RankLog.error("Falha ao coletar dados do personagem.")
+        RankMain.submitted[playerIndex] = false
         return
     end
 
@@ -41,25 +43,39 @@ end
 
 RankMain.triggerRank = triggerRank
 
+-- Verifica se o player é o jogador local de forma defensiva (B42.19).
+-- Em B42, isLocalPlayer() pode lançar exceção em objetos de jogador morto/transicionando.
+local function isLocalPlayer(player, _playerIndex)
+    local ok, result = pcall(function() return player:isLocalPlayer() end)
+    if ok and result == true  then return true  end
+    if ok and result == false then return false end
+    -- isLocalPlayer() falhou; em single-player toda morte é do jogador local.
+    -- Em multiplayer (isClient()=true) negamos para evitar falso positivo.
+    return not (isClient and isClient())
+end
+
 -- ── Evento: morte do jogador ────────────────────────────────
 local function onPlayerDeath(player, playerIndex)
-    if not player or not player:isLocalPlayer() then return end
+    if not player then return end
 
     playerIndex = playerIndex or 0
+
+    if not isLocalPlayer(player, playerIndex) then return end
+
     RankLog.info("OnPlayerDeath recebido para o jogador local, playerIndex=" .. playerIndex)
 
-    -- Delay de ~1.5s para a tela de morte do jogo aparecer primeiro.
-    -- Re-obtém o player via getSpecificPlayer para evitar referência stale.
-    local capturedIndex = playerIndex
+    -- Captura a referência do player ANTES da morte ser processada.
+    -- Não re-obtém via getSpecificPlayer() pois o slot pode ser nil após a morte.
+    local capturedPlayer = player
+    local capturedIndex  = playerIndex
     local ticks  = 0
-    local TARGET = 90
+    local TARGET = 90  -- ~1.5s a 60fps para a tela de morte aparecer primeiro
 
     local function waitTick()
         ticks = ticks + 1
         if ticks >= TARGET then
             Events.OnTick.Remove(waitTick)
-            local livePlayer = getSpecificPlayer(capturedIndex) or player
-            triggerRank(livePlayer, capturedIndex)
+            triggerRank(capturedPlayer, capturedIndex, true)
         end
     end
 
@@ -82,7 +98,7 @@ local function onChatCommand(text)
     end
     RankLog.info("Comando /rank executado manualmente.")
     RankMain.submitted[0] = false  -- permite gerar novamente
-    triggerRank(player, 0)
+    triggerRank(player, 0, false)
     return true
 end
 
@@ -91,7 +107,7 @@ local function onGenerateRank(worldObjects, playerIndex)
     local player = getSpecificPlayer(playerIndex)
     if not player then return end
     RankMain.submitted[playerIndex] = false
-    triggerRank(player, playerIndex)
+    triggerRank(player, playerIndex, false)
 end
 
 local function onFillWorldContextMenu(playerIndex, context, worldObjects, test)
@@ -112,4 +128,4 @@ else
     RankLog.warn("OnTryTalkInChat indisponivel nesta versao. Comando /rank desabilitado.")
 end
 
-RankLog.info("Mod carregado — B42.19+ | v1.3.0")
+RankLog.info("Mod carregado — B42.19+ | v1.4.0")

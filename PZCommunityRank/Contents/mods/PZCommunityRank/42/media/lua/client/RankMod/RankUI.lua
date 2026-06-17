@@ -16,11 +16,12 @@ local iW  = W - PAD * 2
 local COL2 = PAD + 150
 
 -- Layout vertical
+-- Seção de progresso: cabeçalho + 4 linhas (tempo, kills, profissão, status)
 local BTN_W     = 140
 local ROW_H     = 26
-local PROG_SEC  = { y = ROW_H + 20, h = 64 }   -- y=46
-local SEP_Y     = PROG_SEC.y + PROG_SEC.h + 8   -- 118
-local H         = SEP_Y + 46                     -- 164
+local PROG_SEC  = { y = ROW_H + 20, h = 100 }  -- y=46, h=100 (4 linhas)
+local SEP_Y     = PROG_SEC.y + PROG_SEC.h + 8  -- 154
+local H         = SEP_Y + 46                    -- 200
 
 local function addRow(parent, x, y, key, value)
     local lKey = ISLabel:new(x, y, 16, key, 1, 1, 1, 1, UIFont.Small, true)
@@ -68,9 +69,12 @@ function RankSubmitUI:initialise()
 
     -- ── Seção: Progresso ──────────────────────────────────────
     local py = PROG_SEC.y
-    addSectionHeader(self, PAD + 4, py + 4, "Progresso:")
-    addRow(self, PAD + 4, py + 22, "Dias vivo:",     self.entry.time_str or "?")
-    addRow(self, PAD + 4, py + 40, "Zumbis mortos:", tostring(self.entry.kills or 0))
+    local statusLabel = self.entry.is_dead and "Morto" or "Vivo"
+    addSectionHeader(self, PAD + 4, py + 4,  "Progresso:")
+    addRow(self, PAD + 4, py + 22, "Sobrevivência:",          self.entry.time_str or "?")
+    addRow(self, PAD + 4, py + 40, "Zumbis mortos:",          tostring(self.entry.kills or 0))
+    addRow(self, PAD + 4, py + 58, "Profissão:",              self.entry.profession or "Desconhecida")
+    addRow(self, PAD + 4, py + 76, "Status:",                 statusLabel)
 
     -- ── Botão fechar ──────────────────────────────────────────
     self.btnClose = ISButton:new(W / 2 - 75, SEP_Y + 10, 150, 30,

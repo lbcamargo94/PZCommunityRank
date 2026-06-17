@@ -108,9 +108,48 @@ local function getCharacterName(player)
     return "Sobrevivente"
 end
 
--- desc:getProfession*() retornam tipos Java não-mapeados no Kahlua B42.19,
--- causando RuntimeException que escapa do pcall. Sem caminho seguro disponível.
-local function getProfessionName()
+-- B42.19 renomeou getProfession() para getOccupation(). A API antiga gerava
+-- RuntimeException que escapava do pcall. A nova API retorna String ou objeto
+-- Lua nativo, ambos seguros. Tentamos múltiplos caminhos com fallbacks.
+local function getProfessionName(player)
+    local ok, desc = pcall(function() return player:getDescriptor() end)
+    if not ok or not desc then return "Desconhecida" end
+
+    -- B42.19: getOccupation() substitui getProfession()
+    local ok2, occ = pcall(function() return desc:getOccupation() end)
+    if ok2 and occ ~= nil then
+        if type(occ) == "string" and occ ~= "" then
+            return occ
+        end
+        if type(occ) == "table" then
+            return occ.Name or occ.name or occ.type or "Desconhecida"
+        end
+        -- Objeto Java mapeado: tenta métodos seguros de string.
+        -- O índice occ[m] e a chamada ficam ambos dentro do pcall porque
+        -- indexar um userdata não registrado no Kahlua também pode lançar exceção.
+        local nameMethods = {"getName", "getType", "getId"}
+        for _, m in ipairs(nameMethods) do
+            local ok3, v = pcall(function()
+                local fn = occ[m]
+                if type(fn) == "function" then return fn(occ) end
+            end)
+            if ok3 and type(v) == "string" and v ~= "" and not v:find("@") then
+                return v
+            end
+        end
+    end
+
+    -- Fallback: métodos diretos no descriptor que retornam String
+    local descStringMethods = {"getProfessionName", "getOccupationName", "getOccupationType"}
+    for _, m in ipairs(descStringMethods) do
+        if type(desc[m]) == "function" then
+            local ok4, v = pcall(function() return desc[m](desc) end)
+            if ok4 and type(v) == "string" and v ~= "" then
+                return v
+            end
+        end
+    end
+
     return "Desconhecida"
 end
 
@@ -130,7 +169,20 @@ local function getTraitsStr(player)
     return ""
 end
 
-function RankData.collect(player)
+-- Detecta se o jogador está morto quando isDead não é passado explicitamente.
+local function resolveIsDead(player, isDead)
+    if isDead ~= nil then return isDead end
+    local ok, dead = pcall(function() return player:isDead() end)
+    if ok and dead ~= nil then return dead == true end
+    local hOk, hp = pcall(function()
+        return player:getBodyDamage():getOverallBodyHealth()
+    end)
+    if hOk and type(hp) == "number" then return hp <= 0 end
+    return false
+end
+
+-- isDead: true = chamado por morte, false/nil = trigger manual (jogador vivo)
+function RankData.collect(player, isDead)
     if not player then
         RankLog.error("RankData.collect chamado sem player valido.")
         return nil
@@ -163,12 +215,16 @@ function RankData.collect(player)
         if s.level >= 10 then maxSkills = maxSkills + 1 end
     end
 
-    RankLog.info(string.format("Dados coletados: kills=%d, tempo_min=%d, skills=%d, max=%d",
-        kills, timeRaw, #skillsRaw, maxSkills))
+    local dead = resolveIsDead(player, isDead)
+    local profession = getProfessionName(player)
+
+    RankLog.info(string.format(
+        "Dados coletados: kills=%d, tempo_min=%d, skills=%d, max=%d, morto=%s, prof=%s",
+        kills, timeRaw, #skillsRaw, maxSkills, tostring(dead), profession))
 
     return {
         character_name = getCharacterName(player),
-        profession      = getProfessionName(),
+        profession      = profession,
         weight_str      = getWeightStr(player),
         traits_str      = getTraitsStr(player),
         kills           = kills,
@@ -177,5 +233,6 @@ function RankData.collect(player)
         skills          = skillsStrs,
         skills_raw      = skillsRaw,
         max_skills      = maxSkills,
+        is_dead         = dead,
     }
 end

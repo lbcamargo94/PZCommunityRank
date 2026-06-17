@@ -2,10 +2,14 @@
 --  RankCode.lua — Gerador do código de submissão
 --
 --  Formato (antes da ofuscação):
---  PZR|<nome_personagem>|<profissao>|<kills>|<minutos_totais>|<skills>
+--  PZR|<nome_personagem>|<profissao>|<kills>|<minutos_totais>|<skills>|<status>
+--
+--  <status>: "morto" ou "vivo"
 --
 --  O texto acima é ofuscado com XOR + Base64 e salvo com o
---  prefixo "PZRX1:" (identifica o formato/versão do arquivo).
+--  prefixo "PZRX2:" (v1.4+, 7 campos). O prefixo "PZRX1:" era
+--  o formato antigo com 6 campos (sem o campo <status>).
+--  O site (src/app.ts) deve checar o prefixo para saber o formato.
 --
 --  IMPORTANTE: isto é OFUSCAÇÃO, não criptografia forte — o mod é
 --  Lua aberto (Workshop) e o site é JS aberto no navegador, então
@@ -125,22 +129,24 @@ function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local charName   = (entry.character_name or "Sobrevivente"):gsub("|", " ")
     local profession = (entry.profession or "Desconhecida"):gsub("|", " ")
+    local status     = entry.is_dead and "morto" or "vivo"
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s",
         charName,
         profession,
         entry.kills or 0,
         entry.time_raw or 0,
-        skillsStr
+        skillsStr,
+        status
     )
 
-    return "PZRX1:" .. obfuscate(plain)
+    return "PZRX2:" .. obfuscate(plain)
 end
 
--- Valida se uma string é um código PZRX1 válido (decodifica e checa o formato)
+-- Valida se uma string é um código PZRX1 (v1.3, 6 campos) ou PZRX2 (v1.4+, 7 campos).
 function RankCode.isValid(code)
     if not code or type(code) ~= "string" then return false end
-    local prefix, encoded = code:match("^(PZRX1:)(.+)$")
+    local prefix, encoded = code:match("^(PZRX[12]:)(.+)$")
     if not prefix then return false end
 
     local ok, plain = pcall(deobfuscate, encoded)
