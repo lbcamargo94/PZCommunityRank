@@ -6,19 +6,20 @@ Mod para **Project Zomboid Build 42+** que adiciona um sistema de ranking comuni
 
 ## Funcionalidades
 
-- Coleta automaticamente as estatísticas do personagem ao morrer
-- Exibe uma janela com resumo da run (mortes, tempo sobrevivido, habilidades)
-- Gera um código de submissão codificado para o ranking comunitário
-- Acesso via menu de contexto (clique direito no mundo)
+- Janela automática ao morrer com resumo completo da run
+- Exportação automática do código em arquivo `.txt` a cada geração
+- Status da run (vivo ou morto) incluído no código de submissão
+- Acesso manual via menu de contexto (clique direito no mundo)
 - Sem necessidade de internet ou configuração
 - Integrado à UI nativa do jogo
 
 ## Dados coletados
 
 - Nome do personagem
-- Peso do personagem
+- Status: vivo (geração manual) ou morto (ao morrer)
 - Tempo de sobrevivência (anos, dias, horas, minutos)
 - Total de zumbis abatidos
+- Profissão do personagem
 - 35 habilidades: combate, artesanato, sobrevivência, culinária e mais
 
 ## Compatibilidade
@@ -47,7 +48,36 @@ Mod para **Project Zomboid Build 42+** que adiciona um sistema de ranking comuni
 1. Jogue normalmente — o mod funciona em segundo plano
 2. Quando seu personagem morrer, uma janela aparecerá automaticamente com as estatísticas da run
 3. Copie o código gerado e acesse o site da comunidade para submeter seu resultado
-4. Alternativamente, clique com o botão direito em qualquer objeto do mundo e acesse a opção **Gerar Rank**
+4. O código também é salvo automaticamente em arquivo `.txt` (veja **Arquivos gerados**)
+5. Alternativamente, clique com o botão direito em qualquer objeto do mundo e acesse a opção **Gerar Rank**
+
+## Arquivos gerados
+
+A cada código gerado (morte ou menu de contexto), o mod cria um arquivo `.txt` com o resumo da run:
+
+```
+Windows : %USERPROFILE%\Zomboid\Lua\pz_rank\
+Linux   : ~/.local/share/Zomboid/Lua/pz_rank/
+```
+
+Nome do arquivo: `pz_rank_YYYY-MM-DD_HH-MM-SS_N.txt`
+
+Conteúdo de exemplo:
+
+```
+=== PZ Community Rank ===
+Data/Hora : 2026-06-17 14-30-45
+Personagem: João Silva
+Profissao : Desconhecida
+Status    : Morto
+Sobrev.   : 3 dias, 12h, 5m
+Zumbis    : 47
+
+--- Codigo de Submissao ---
+PZRX2:...
+```
+
+O log interno do mod fica em `%USERPROFILE%\Zomboid\Lua\PZRank_log.txt` e registra cada etapa da coleta de dados — útil para diagnóstico em caso de problemas.
 
 ## Estrutura do projeto
 
@@ -61,6 +91,7 @@ PZCommunityRank/
             ├── RankData.lua   # Coleta de estatísticas do jogador
             ├── RankCode.lua   # Geração do código de submissão (XOR + Base64)
             ├── RankUI.lua     # Janela de exibição dos resultados
+            ├── RankFile.lua   # Exportação do código para arquivo .txt
             └── RankLog.lua    # Sistema de logs
 ```
 
@@ -72,9 +103,22 @@ Campos (formato `PZRX2:`): `PZR|nome|profissão|kills|minutos|habilidades|status
 
 Os dados são codificados com XOR + Base64. A obfuscação é intencionalmente leve — o objetivo é dificultar edições manuais, não esconder informações.
 
-## Versão
+## Histórico de versões
 
-**1.4.0** — compatível com Project Zomboid 42.19+
+### v1.4.0 — compatível com Project Zomboid 42.19+
+
+**Novidades:**
+
+- Janela de rank ao morrer corrigida para B42.19 (posição, temporizador e flag de controle)
+- Campo `status` (`morto`/`vivo`) adicionado ao código de submissão (formato PZRX2)
+- Exportação automática do código para arquivo `.txt` em `Lua/pz_rank/`
+
+**Correções:**
+
+- Janela era criada fora da tela após a morte (coordenadas negativas) — corrigido
+- Temporizador de delay usava evento pausado durante tela de morte — corrigido
+- Flag `submitted` bloqueava silenciosamente o disparo automático pós-morte — corrigido
+- `RuntimeException` logados pelo PZ ao acessar métodos não registrados no bridge Kahlua — eliminados com guards de existência em todos os pontos críticos
 
 ## Licença
 
