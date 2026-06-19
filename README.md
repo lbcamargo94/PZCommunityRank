@@ -7,11 +7,12 @@ Mod para **Project Zomboid Build 42+** que adiciona um sistema de ranking comuni
 ## Funcionalidades
 
 - Janela automática ao morrer com resumo completo da run
-- Exportação automática do código em arquivo `.txt` a cada geração
+- Exportação automática do código em arquivo `.txt` a cada geração (morte, level up, save, a cada ~5 min)
 - Status da run (vivo ou morto) incluído no código de submissão
 - Acesso manual via menu de contexto (clique direito no mundo)
-- Sem necessidade de internet ou configuração
+- Sem necessidade de internet ou configuração no jogo
 - Integrado à UI nativa do jogo
+- Integração com **PZ-Rank-Companion** — app que monitora a pasta e envia o código ao site automaticamente
 
 ## Dados coletados
 
@@ -47,9 +48,15 @@ Mod para **Project Zomboid Build 42+** que adiciona um sistema de ranking comuni
 
 1. Jogue normalmente — o mod funciona em segundo plano
 2. Quando seu personagem morrer, uma janela aparecerá automaticamente com as estatísticas da run
-3. Copie o código gerado e acesse o site da comunidade para submeter seu resultado
-4. O código também é salvo automaticamente em arquivo `.txt` (veja **Arquivos gerados**)
-5. Alternativamente, clique com o botão direito em qualquer objeto do mundo e acesse a opção **Gerar Rank**
+3. O código é copiado da janela e também salvo automaticamente em arquivo `.txt` (veja **Arquivos gerados**)
+4. Use o **PZ-Rank-Companion** para sincronização automática: o app monitora a pasta e envia o código ao site sem intervenção manual
+5. Alternativamente, clique com o botão direito em qualquer objeto do mundo e acesse **Gerar Rank** para gerar o código manualmente (personagem vivo)
+
+O mod também gera arquivos silenciosos (sem abrir a janela) nas seguintes situações:
+
+- Ao subir de nível em qualquer habilidade
+- Ao salvar o jogo ou sair para o menu principal
+- A cada ~5 minutos automaticamente
 
 ## Arquivos gerados
 
@@ -95,6 +102,8 @@ PZCommunityRank/
             └── RankLog.lua    # Sistema de logs
 ```
 
+O sync com o site é feito pelo **PZ-Rank-Companion** (repositório separado), que monitora a pasta `pz_rank/` e envia o código via API. O mod em si não faz nenhuma requisição de rede.
+
 ## Formato do código de submissão
 
 A partir da **v1.4.0**, o código gerado segue o formato `PZRX2:<dados_codificados>` (7 campos). O prefixo `PZRX1:` era o formato legado com 6 campos (sem o campo de status). O site (`src/app.ts`) deve verificar o prefixo para selecionar o parser correto.
@@ -104,6 +113,21 @@ Campos (formato `PZRX2:`): `PZR|nome|profissão|kills|minutos|habilidades|status
 Os dados são codificados com XOR + Base64. A obfuscação é intencionalmente leve — o objetivo é dificultar edições manuais, não esconder informações.
 
 ## Histórico de versões
+
+### v1.6.0 — auto-sync sem rede no mod
+
+**Novidades:**
+
+- Geração automática de arquivos em 3 novos gatilhos: `Events.LevelPerk` (level up), `Events.OnSave` (save/saída) e `OnTick` periódico (~5 min)
+- Deduplicação via `_lastSilentCode` — sem arquivos repetidos se o estado não mudou
+- Integração com **PZ-Rank-Companion**: o app externo monitora a pasta e envia ao site
+
+**Limpeza:**
+
+- Removido bridge Java (`RankAPI.lua`, `RankModData.lua`, `RankingAPI.jar`) — `luajava` é null no client B42.19 e o código era 100% dead
+- Removidos campos `weight_str` e `traits_str` de `RankData.collect()` — nunca exibidos na UI nem incluídos no código de submissão
+
+---
 
 ### v1.4.0 — compatível com Project Zomboid 42.19+
 

@@ -121,57 +121,43 @@ end
 -- Ambos os erros são logados pelo PZ mesmo quando capturados por pcall.
 -- A verificação type(desc.X) == "function" garante que só chamamos o que existe.
 local function getProfessionName(player)
-    if type(player.getDescriptor) ~= "function" then return "Desconhecida" end
-    local ok, desc = pcall(function() return player:getDescriptor() end)
-    if not ok or not desc then return "Desconhecida" end
-
-    -- Tenta getOccupation() apenas se o bridge expõe o método.
-    -- Se retornar String ou tabela Lua, usa diretamente.
-    -- Se retornar userdata Java, tenta extrair nome via métodos seguros.
-    if type(desc.getOccupation) == "function" then
-        local ok2, occ = pcall(function() return desc:getOccupation() end)
-        if ok2 and occ ~= nil then
-            if type(occ) == "string" and occ ~= "" then return occ end
-            if type(occ) == "table" then
-                return occ.Name or occ.name or occ.type or "Desconhecida"
-            end
-            -- userdata: índice e chamada dentro do mesmo pcall
-            for _, m in ipairs({"getName", "getType", "getId"}) do
-                local ok3, v = pcall(function()
-                    local fn = occ[m]
-                    if type(fn) == "function" then return fn(occ) end
-                end)
-                if ok3 and type(v) == "string" and v ~= "" and not v:find("@") then
-                    return v
-                end
-            end
-        end
+    if not player then
+        return "Desconhecida"
     end
 
-    -- Fallback: métodos que retornam String diretamente no descriptor
-    for _, m in ipairs({"getProfessionName", "getOccupationName", "getOccupationType"}) do
-        if type(desc[m]) == "function" then
-            local ok2, v = pcall(function() return desc[m](desc) end)
-            if ok2 and type(v) == "string" and v ~= "" then return v end
-        end
+    local ok, desc = pcall(function()
+        return player:getDescriptor()
+    end)
+
+    if not ok or not desc then
+        return "Desconhecida"
     end
 
-    return "Desconhecida"
-end
+    local okProf, profession = pcall(function()
+        return desc:getCharacterProfession()
+    end)
 
-local function getWeightStr(player)
-    if type(player.getNutrition) ~= "function" then return "?" end
-    local ok, w = pcall(function() return player:getNutrition():getWeight() end)
-    if ok and type(w) == "number" then
-        return string.format("%.1f Kg", w):gsub("%.", ",")
+    if not okProf or not profession then
+        return "Desconhecida"
     end
-    return "?"
-end
 
-local function getTraitsStr(player)
-    -- CharacterTrait não é tipo registrado no Kahlua B42.19:
-    -- traits:get(i) causa RuntimeException que escapa do pcall.
-    return ""
+    local okDef, professionDef = pcall(function()
+        return CharacterProfessionDefinition.getCharacterProfessionDefinition(profession)
+    end)
+
+    if not okDef or not professionDef then
+        return tostring(profession)
+    end
+
+    local okName, professionName = pcall(function()
+        return professionDef:getUIName()
+    end)
+
+    if okName and professionName and professionName ~= "" then
+        return professionName
+    end
+
+    return tostring(profession)
 end
 
 -- Detecta se o jogador está morto quando isDead não é passado explicitamente.
@@ -230,8 +216,6 @@ function RankData.collect(player, isDead)
     return {
         character_name = getCharacterName(player),
         profession      = profession,
-        weight_str      = getWeightStr(player),
-        traits_str      = getTraitsStr(player),
         kills           = kills,
         time_raw        = timeRaw,
         time_str        = RankData.minutesToYDHM(timeRaw),

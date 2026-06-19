@@ -1,0 +1,8 @@
+# Build artifacts (Java bridge — removido na v1.6.0)
+PZCommunityRank/src/
+PZCommunityRank/out/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
