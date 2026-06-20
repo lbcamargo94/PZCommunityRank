@@ -125,19 +125,23 @@ local function deobfuscate(encoded)
 end
 
 -- Gera o código (com prefixo de formato) a partir dos dados coletados
+-- PZRX2: 8 campos — nome|profissão|kills|tempo|skills|status|sandbox
+-- Campo sandbox: "ok" = configurações válidas; "invalido" = sandbox diverge do desafio
 function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local charName   = (entry.character_name or "Sobrevivente"):gsub("|", " ")
     local profession = (entry.profession or "Desconhecida"):gsub("|", " ")
     local status     = entry.is_dead and "morto" or "vivo"
+    local sandbox    = (entry.sandbox_ok == false) and "invalido" or "ok"
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s",
         charName,
         profession,
         entry.kills or 0,
         entry.time_raw or 0,
         skillsStr,
-        status
+        status,
+        sandbox
     )
 
     return "PZRX2:" .. obfuscate(plain)

@@ -7,6 +7,7 @@ require "RankMod/RankData"
 require "RankMod/RankCode"
 require "RankMod/RankUI"
 require "RankMod/RankFile"
+require "RankMod/RankSandbox"
 
 RankMain = {}
 RankMain.submitted = {}
@@ -21,6 +22,10 @@ local _lastSilentCode = nil
 -- Contador para disparo periódico (~5 min a 60fps).
 local _periodicTick  = 0
 local PERIODIC_TICKS = 18000
+
+-- Contador de kills desde o último silentUpdate por kills.
+local _killsSinceSync = 0
+local KILLS_PER_SYNC  = 10   -- dispara sync a cada 10 kills
 
 -- Coleta dados, gera código, salva arquivo e abre a UI de resultado.
 -- O Companion (app externo) faz o sync via arquivo — nenhuma rede aqui.
@@ -38,6 +43,14 @@ local function triggerRank(player, playerIndex, isDead)
         RankLog.error("Falha ao coletar dados.")
         RankMain.submitted[playerIndex] = false
         return
+    end
+
+    -- Valida sandbox e embute o resultado no entry para inclusão no código.
+    local sandboxOk = true
+    pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
+    entry.sandbox_ok = sandboxOk
+    if not sandboxOk then
+        RankLog.warn("triggerRank: sandbox invalido — codigo sera marcado como 'invalido'.")
     end
 
     local code = RankCode.generate(entry)
@@ -61,6 +74,10 @@ local function silentUpdate(player, playerIndex)
 
     local entry = RankData.collect(player, false)
     if not entry then return end
+
+    local sandboxOk = true
+    pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
+    entry.sandbox_ok = sandboxOk
 
     local code = RankCode.generate(entry)
     if not RankCode.isValid(code) then return end
@@ -119,6 +136,7 @@ end
 -- ── Evento: início de partida ───────────────────────────────
 local function onGameStart()
     RankMain.submitted = {}
+    _killsSinceSync    = 0
     RankLog.info("OnGameStart: submissoes resetadas.")
 
     -- Grace period: bloqueia OnPlayerDeath nos primeiros 120 ticks para evitar
@@ -131,6 +149,12 @@ local function onGameStart()
         if graceTicks >= 120 then
             _isStartingUp = false
             pcall(function() Events.OnTick.Remove(clearStartup) end)
+            -- Sync inicial + validação de sandbox após carregamento estável.
+            local ok, player = pcall(getPlayer)
+            if ok and player and isLocalPlayer(player) then
+                silentUpdate(player, 0)
+            end
+            pcall(function() RankSandbox.check(false) end)
         end
     end
     pcall(function() Events.OnTick.Add(clearStartup) end)
@@ -175,7 +199,7 @@ else
     RankLog.warn("OnTryTalkInChat indisponivel no B42. Comando /rank desabilitado.")
 end
 
--- ── Atualização ao salvar / sair do mundo ──────────────────
+-- ── Atualização + validação ao salvar / sair do mundo ─────
 -- OnSave dispara antes de salvar, inclusive ao sair para o menu principal.
 pcall(function()
     Events.OnSave.Add(function()
@@ -184,6 +208,7 @@ pcall(function()
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
         silentUpdate(player, 0)
+        pcall(function() RankSandbox.check(false) end)
     end)
 end)
 
@@ -191,6 +216,31 @@ end)
 -- A assinatura do evento varia entre versões do PZ; capturamos o player direto.
 pcall(function()
     Events.LevelPerk.Add(function(...)
+        if _isStartingUp then return end
+        local ok, player = pcall(getPlayer)
+        if not ok or not player then return end
+        if not isLocalPlayer(player) then return end
+        silentUpdate(player, 0)
+    end)
+end)
+
+-- ── Atualização ao matar um zumbi (debounce: 1 sync a cada 10 kills) ──
+pcall(function()
+    Events.OnZombieDead.Add(function(zombie)
+        if _isStartingUp then return end
+        _killsSinceSync = _killsSinceSync + 1
+        if _killsSinceSync < KILLS_PER_SYNC then return end
+        _killsSinceSync = 0
+        local ok, player = pcall(getPlayer)
+        if not ok or not player then return end
+        if not isLocalPlayer(player) then return end
+        silentUpdate(player, 0)
+    end)
+end)
+
+-- ── Atualização a cada novo dia no jogo ────────────────────
+pcall(function()
+    Events.EveryDays.Add(function()
         if _isStartingUp then return end
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end

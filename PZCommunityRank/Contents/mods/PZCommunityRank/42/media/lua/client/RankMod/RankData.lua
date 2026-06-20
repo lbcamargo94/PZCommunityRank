@@ -6,18 +6,21 @@ require "RankMod/RankLog"
 
 RankData = {}
 
+-- IDs confirmados no B42.19 via probe de Perks[].
+-- LongBlunt+ShortBlunt → mesclados em "Blunt" no B42.
+-- ShortBlade, Foraging e Knapping: nomes B42 ainda não confirmados (probe em andamento).
 local PERKS = {
     { id = "Sprinting",    nome = "Corrida"             },
-    { id = "Lightfooted",  nome = "Pés Leves"           },
+    { id = "Lightfoot",    nome = "Pés Leves"           },
     { id = "Nimble",       nome = "Agilidade"           },
-    { id = "Sneaking",     nome = "Furtividade"         },
+    { id = "Sneak",        nome = "Furtividade"         },
     { id = "Fitness",      nome = "Condicionamento"     },
     { id = "Strength",     nome = "Força"               },
     { id = "Axe",          nome = "Machado"             },
-    { id = "LongBlunt",    nome = "Contundente Longo"    },
-    { id = "ShortBlunt",   nome = "Contundente Curto"   },
+    { id = "Blunt",        nome = "Contundente Longo"   },
+    { id = "SmallBlunt",   nome = "Contundente Curto"   },
     { id = "LongBlade",    nome = "Lâmina Longa"        },
-    { id = "ShortBlade",   nome = "Lâmina Curta"        },
+    { id = "SmallBlade",   nome = "Lâmina Curta"        },
     { id = "Spear",        nome = "Lança"               },
     { id = "Maintenance",  nome = "Manutenção"          },
     { id = "Aiming",       nome = "Mira"                },
@@ -25,38 +28,45 @@ local PERKS = {
     { id = "Cooking",      nome = "Culinária"           },
     { id = "Fishing",      nome = "Pesca"               },
     { id = "Trapping",     nome = "Armadilhas"          },
-    { id = "Foraging",     nome = "Coleta"              },
-    { id = "FirstAid",     nome = "Primeiros Socorros"  },
-    { id = "Carpentry",    nome = "Carpintaria"         },
-    { id = "Agriculture",  nome = "Agricultura"         },
-    { id = "Electrical",   nome = "Eletricidade"        },
+    { id = "Survivalist",  nome = "Sobrevivência"       },
+    { id = "Doctor",       nome = "Medicina"            },
+    { id = "Woodwork",     nome = "Marcenaria"          },
+    { id = "Farming",      nome = "Agricultura"         },
+    { id = "Electricity",  nome = "Eletricidade"        },
     { id = "Mechanics",    nome = "Mecânica"            },
     { id = "MetalWelding", nome = "Soldagem"            },
     { id = "Tailoring",    nome = "Costura"             },
-    { id = "Knapping",     nome = "Lascamento"          },
+    { id = "FlintKnapping",nome = "Lascamento"          },
     { id = "Carving",      nome = "Entalhamento"        },
     { id = "Masonry",      nome = "Alvenaria"           },
     { id = "Pottery",      nome = "Cerâmica"            },
     { id = "Blacksmith",   nome = "Ferraria"            },
     { id = "Glassmaking",  nome = "Vidraria"            },
-    { id = "AnimalCare",   nome = "Cuidado Animal"      },
+    { id = "Husbandry",    nome = "Pecuária"            },
     { id = "Butchering",   nome = "Abate"               },
     { id = "Tracking",     nome = "Rastreamento"        },
 }
 
+-- Cache descoberto em runtime para evitar múltiplos warns do mesmo ID.
+local _perkCache = {}
+local _perkMiss  = {}
+
+-- Retorna o enum constant de Perks[] ou nil.
+-- player:getPerkLevel() aceita o enum constant diretamente — PerkFactory.getPerk não é necessário.
+-- Perks[key] retorna nil para chaves inexistentes sem lançar exceção.
 local function getPerkObj(id)
-    local ok1, enumVal = pcall(function() return Perks[id] end)
-    if ok1 and enumVal then
-        local ok2, p = pcall(function() return PerkFactory.getPerk(enumVal) end)
-        if ok2 and p then return p end
-        return enumVal
+    if _perkCache[id] ~= nil then return _perkCache[id] end
+    if _perkMiss[id]  then return nil end
+    local p = Perks[id]
+    if p ~= nil then
+        _perkCache[id] = p
+        return p
     end
-    local ok3, p = pcall(PerkFactory.getPerkByName, id)
-    if ok3 and p then return p end
-    -- ID não resolvido: ajuda identificar nomes que mudaram entre versões do B42.
-    RankLog.warn("getPerkObj: ID nao resolvido em B42 — " .. tostring(id))
+    _perkMiss[id] = true
+    RankLog.warn("getPerkObj: ID nao resolvido em B42 — " .. id)
     return nil
 end
+
 
 -- Retorna (rawTable, stringsTable).
 -- rawTable: [{id, nome, level}] — usado internamente (maxSkills, UI futura).
