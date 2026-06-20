@@ -14,8 +14,8 @@ local PERKS = {
     { id = "Fitness",      nome = "Condicionamento"     },
     { id = "Strength",     nome = "Força"               },
     { id = "Axe",          nome = "Machado"             },
-    { id = "LongBlunt",    nome = "Cont. Longo"         },
-    { id = "ShortBlunt",   nome = "Cont. Curto"         },
+    { id = "LongBlunt",    nome = "Contundente Longo"    },
+    { id = "ShortBlunt",   nome = "Contundente Curto"   },
     { id = "LongBlade",    nome = "Lâmina Longa"        },
     { id = "ShortBlade",   nome = "Lâmina Curta"        },
     { id = "Spear",        nome = "Lança"               },
@@ -53,10 +53,16 @@ local function getPerkObj(id)
     end
     local ok3, p = pcall(PerkFactory.getPerkByName, id)
     if ok3 and p then return p end
+    -- ID não resolvido: ajuda identificar nomes que mudaram entre versões do B42.
+    RankLog.warn("getPerkObj: ID nao resolvido em B42 — " .. tostring(id))
     return nil
 end
 
--- Retorna (rawTable, stringsTable) — raw para a UI, strings para o código.
+-- Retorna (rawTable, stringsTable).
+-- rawTable: [{id, nome, level}] — usado internamente (maxSkills, UI futura).
+-- stringsTable: ["ID nivel", ...] — formato exportado no código PZRX2.
+-- Exportar o ID em inglês (em vez do nome PT-BR) permite ao backend usar uma
+-- tabela de tradução central e garante que nomes PT-BR não variem entre versões.
 function RankData.getSkills(player)
     local result = {}
     for _, perk in ipairs(PERKS) do
@@ -64,7 +70,7 @@ function RankData.getSkills(player)
         if perkObj then
             local lvlOk, lvl = pcall(function() return player:getPerkLevel(perkObj) end)
             if lvlOk and lvl ~= nil then
-                table.insert(result, { nome = perk.nome, level = lvl })
+                table.insert(result, { id = perk.id, nome = perk.nome, level = lvl })
             end
         end
     end
@@ -72,7 +78,7 @@ function RankData.getSkills(player)
 
     local strs = {}
     for _, s in ipairs(result) do
-        table.insert(strs, s.nome .. " " .. s.level)
+        table.insert(strs, s.id .. " " .. s.level)
     end
     return result, strs
 end
