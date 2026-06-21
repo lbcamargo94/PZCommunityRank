@@ -1,14 +1,15 @@
 -- ============================================================
 --  RankCode.lua — Gerador do código de submissão
 --
---  Formato (antes da ofuscação):
---  PZR|<nome_personagem>|<profissao>|<kills>|<minutos_totais>|<skills>|<status>
+--  Formato atual (antes da ofuscação) — 9 campos:
+--  PZR|<nome>|<profissão>|<kills>|<minutos>|<skills>|<status>|<sandbox>|<traits>
 --
---  <status>: "morto" ou "vivo"
+--  <status>:  "morto" ou "vivo"
+--  <sandbox>: "ok" ou "invalido"
+--  <traits>:  IDs separados por vírgula (ex: "Athletic,Lucky,Smoker"); pode ser vazio
 --
---  O texto acima é ofuscado com XOR + Base64 e salvo com o
---  prefixo "PZRX2:" (v1.4+, 7 campos). O prefixo "PZRX1:" era
---  o formato antigo com 6 campos (sem o campo <status>).
+--  Prefixo "PZRX2:" (v1.4+, 9 campos). Prefixo "PZRX1:" era o
+--  formato legado com 6 campos (sem status, sandbox ou traits).
 --  O site (src/app.ts) deve checar o prefixo para saber o formato.
 --
 --  IMPORTANTE: isto é OFUSCAÇÃO, não criptografia forte — o mod é

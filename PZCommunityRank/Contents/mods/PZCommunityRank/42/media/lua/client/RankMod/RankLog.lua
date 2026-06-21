@@ -21,8 +21,8 @@ local function writeLine(level, msg)
     local line = string.format("[%s] [%s] %s", timestamp(), level, tostring(msg))
     print("[PZRank] " .. line)
 
-    -- B42.19: getFileWriter(name, overwrite, append). Sem fallback que sobrescreva.
-    local ok, writer = pcall(getFileWriter, LOG_FILE, false, true)
+    -- B42.19: getFileWriter(path, create_dirs, append).
+    local ok, writer = pcall(getFileWriter, LOG_FILE, true, true)
     if ok and writer then
         pcall(function()
             writer:write(line .. "\n")
