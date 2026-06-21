@@ -6,93 +6,35 @@ require "RankMod/RankLog"
 
 RankData = {}
 
--- IDs confirmados no B42.19 via probe de Perks[].
--- Renomeações B42: Lightfooted→Lightfoot, Sneaking→Sneak, LongBlunt→Blunt,
--- ShortBlunt→SmallBlunt, ShortBlade→SmallBlade, Carpentry→Woodwork,
--- Electrical→Electricity, Foraging→Survivalist, FirstAid→Doctor,
--- Agriculture→Farming, Knapping→FlintKnapping, AnimalCare→Husbandry.
-local PERKS = {
-    { id = "Sprinting",    nome = "Corrida"             },
-    { id = "Lightfoot",    nome = "Pés Leves"           },
-    { id = "Nimble",       nome = "Agilidade"           },
-    { id = "Sneak",        nome = "Furtividade"         },
-    { id = "Fitness",      nome = "Condicionamento"     },
-    { id = "Strength",     nome = "Força"               },
-    { id = "Axe",          nome = "Machado"             },
-    { id = "Blunt",        nome = "Contundente Longo"   },
-    { id = "SmallBlunt",   nome = "Contundente Curto"   },
-    { id = "LongBlade",    nome = "Lâmina Longa"        },
-    { id = "SmallBlade",   nome = "Lâmina Curta"        },
-    { id = "Spear",        nome = "Lança"               },
-    { id = "Maintenance",  nome = "Manutenção"          },
-    { id = "Aiming",       nome = "Mira"                },
-    { id = "Reloading",    nome = "Recarga"             },
-    { id = "Cooking",      nome = "Culinária"           },
-    { id = "Fishing",      nome = "Pesca"               },
-    { id = "Trapping",     nome = "Armadilhas"          },
-    { id = "Survivalist",  nome = "Sobrevivência"       },
-    { id = "Doctor",       nome = "Medicina"            },
-    { id = "Woodwork",     nome = "Marcenaria"          },
-    { id = "Farming",      nome = "Agricultura"         },
-    { id = "Electricity",  nome = "Eletricidade"        },
-    { id = "Mechanics",    nome = "Mecânica"            },
-    { id = "MetalWelding", nome = "Soldagem"            },
-    { id = "Tailoring",    nome = "Costura"             },
-    { id = "FlintKnapping",nome = "Lascamento"          },
-    { id = "Carving",      nome = "Entalhamento"        },
-    { id = "Masonry",      nome = "Alvenaria"           },
-    { id = "Pottery",      nome = "Cerâmica"            },
-    { id = "Blacksmith",   nome = "Ferraria"            },
-    { id = "Glassmaking",  nome = "Vidraria"            },
-    { id = "Husbandry",    nome = "Pecuária"            },
-    { id = "Butchering",   nome = "Abate"               },
-    { id = "Tracking",     nome = "Rastreamento"        },
-}
-
--- Cache descoberto em runtime para evitar múltiplos warns do mesmo ID.
-local _perkCache = {}
-local _perkMiss  = {}
-
--- Retorna o enum constant de Perks[] ou nil.
--- player:getPerkLevel() aceita o enum constant diretamente — PerkFactory.getPerk não é necessário.
--- Perks[key] retorna nil para chaves inexistentes sem lançar exceção.
-local function getPerkObj(id)
-    if _perkCache[id] ~= nil then return _perkCache[id] end
-    if _perkMiss[id]  then return nil end
-    local p = Perks[id]
-    if p ~= nil then
-        _perkCache[id] = p
-        return p
-    end
-    _perkMiss[id] = true
-    RankLog.warn("getPerkObj: ID nao resolvido em B42 — " .. id)
-    return nil
-end
-
-
--- Retorna (rawTable, stringsTable).
--- rawTable: [{id, nome, level}] — usado internamente (maxSkills, UI futura).
--- stringsTable: ["ID nivel", ...] — formato exportado no código PZRX2.
--- Exportar o ID em inglês (em vez do nome PT-BR) permite ao backend usar uma
--- tabela de tradução central e garante que nomes PT-BR não variem entre versões.
+-- Coleta todas as habilidades dinamicamente via Perks.fromIndex (padrão do jogo, vide ISPerkLog.lua).
+-- perk:getType() devolve o ID inglês (ex: "Blunt", "Woodwork") — o backend traduz para PT-BR.
+-- perk:getParent() ~= Perks.None filtra as categorias-raiz (Física, Combate…) que não têm nível.
+-- Abordagem dinâmica: novos perks adicionados no B42 são coletados automaticamente.
 function RankData.getSkills(player)
-    local result = {}
-    for _, perk in ipairs(PERKS) do
-        local perkObj = getPerkObj(perk.id)
-        if perkObj then
-            local lvlOk, lvl = pcall(function() return player:getPerkLevel(perkObj) end)
+    local rawTable = {}
+    local strs     = {}
+
+    local maxIndexOk, maxIndex = pcall(function() return Perks.getMaxIndex() end)
+    if not maxIndexOk or not maxIndex then
+        RankLog.warn("getSkills: Perks.getMaxIndex() indisponivel")
+        return rawTable, strs
+    end
+
+    for i = 0, maxIndex - 1 do
+        local perkEnum = Perks.fromIndex(i)
+        local perkDef  = PerkFactory.getPerk(perkEnum)
+        if perkDef and perkDef:getParent() ~= Perks.None then
+            local lvlOk, lvl = pcall(function() return player:getPerkLevel(perkEnum) end)
             if lvlOk and lvl ~= nil then
-                table.insert(result, { id = perk.id, nome = perk.nome, level = lvl })
+                local id = tostring(perkDef:getType())
+                table.insert(rawTable, { id = id, level = lvl })
+                table.insert(strs, id .. " " .. lvl)
             end
         end
     end
-    table.sort(result, function(a, b) return a.nome < b.nome end)
 
-    local strs = {}
-    for _, s in ipairs(result) do
-        table.insert(strs, s.id .. " " .. s.level)
-    end
-    return result, strs
+    RankLog.info(string.format("getSkills: %d skills coletadas", #rawTable))
+    return rawTable, strs
 end
 
 function RankData.minutesToYDHM(minutes)
@@ -178,51 +120,40 @@ local function getProfessionName(player)
     return tostring(profession)
 end
 
--- Coleta os traços (traits) do personagem.
--- Em B42.19 o bridge Kahlua NÃO registra player:getTraits() (nil no bridge → log de erro).
--- Mesma regra de getProfessionName: verifica type() antes de chamar.
--- Fallback: desc:getTraits() caso o método esteja no descriptor em vez do player.
+-- Coleta os traços (traits) via API oficial do B42 (ISPlayerStatsUI.lua, SpawnItems.lua):
+--   player:getCharacterTraits():getKnownTraits()          → lista de traits ativas
+--   CharacterTraitDefinition.getCharacterTraitDefinition(obj):getType() → ID inglês
 -- Os IDs são exportados em inglês (ex: "Athletic", "Smoker") para tradução no site.
 local function collectTraits(player)
     local result = {}
-    local source = nil
-    local traitList = nil
 
-    if type(player.getTraits) == "function" then
-        local ok, t = pcall(function() return player:getTraits() end)
-        if ok and t then traitList = t; source = "player" end
-    end
-
-    if not traitList then
-        local dOk, desc = pcall(function() return player:getDescriptor() end)
-        if dOk and desc and type(desc.getTraits) == "function" then
-            local tOk, t = pcall(function() return desc:getTraits() end)
-            if tOk and t then traitList = t; source = "desc" end
-        end
-    end
-
-    if not traitList then
-        RankLog.warn("collectTraits: nenhum metodo de traits disponivel no B42 (player.getTraits=" ..
-            tostring(type(player.getTraits)) .. ")")
+    local ctOk, charTraits = pcall(function() return player:getCharacterTraits() end)
+    if not ctOk or not charTraits then
+        RankLog.warn("collectTraits: getCharacterTraits() indisponivel")
         return result
     end
 
-    local sizeOk, size = pcall(function() return traitList:size() end)
-    if not sizeOk or not size or size == 0 then
-        RankLog.info("collectTraits: lista vazia via " .. (source or "?"))
+    local knownOk, known = pcall(function() return charTraits:getKnownTraits() end)
+    if not knownOk or not known then
+        RankLog.warn("collectTraits: getKnownTraits() indisponivel")
         return result
     end
 
+    local size = known:size()
     for i = 0, size - 1 do
-        local id
-        local getOk = pcall(function() id = tostring(traitList:get(i)) end)
-        if getOk and id and id ~= "" and id ~= "nil" then
-            table.insert(result, id)
+        local defOk, def = pcall(function()
+            return CharacterTraitDefinition.getCharacterTraitDefinition(known:get(i))
+        end)
+        if defOk and def then
+            local typeOk, traitId = pcall(function() return tostring(def:getType()) end)
+            if typeOk and traitId and traitId ~= "" and traitId ~= "nil" then
+                table.insert(result, traitId)
+            end
         end
     end
 
-    RankLog.info(string.format("collectTraits: %d traits via %s: %s",
-        #result, source or "?", table.concat(result, ",")))
+    RankLog.info(string.format("collectTraits: %d traits: %s",
+        #result, table.concat(result, ",")))
     return result
 end
 
