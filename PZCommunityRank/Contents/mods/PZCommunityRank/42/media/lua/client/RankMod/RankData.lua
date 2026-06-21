@@ -176,6 +176,27 @@ local function getProfessionName(player)
     return tostring(profession)
 end
 
+-- Coleta os traços (traits) do personagem.
+-- player:getTraits() retorna ArrayList<String> em B42; iteração segura com pcall.
+-- Os IDs são exportados em inglês (ex: "Athletic", "Smoker") para tradução no site.
+local function collectTraits(player)
+    local result = {}
+    local ok, traits = pcall(function() return player:getTraits() end)
+    if not ok or not traits then return result end
+
+    local sizeOk, size = pcall(function() return traits:size() end)
+    if not sizeOk or not size or size == 0 then return result end
+
+    for i = 0, size - 1 do
+        local id
+        local getOk = pcall(function() id = tostring(traits:get(i)) end)
+        if getOk and id and id ~= "" and id ~= "nil" then
+            table.insert(result, id)
+        end
+    end
+    return result
+end
+
 -- Detecta se o jogador está morto quando isDead não é passado explicitamente.
 local function resolveIsDead(player, isDead)
     if isDead ~= nil then return isDead end
@@ -224,10 +245,11 @@ function RankData.collect(player, isDead)
 
     local dead = resolveIsDead(player, isDead)
     local profession = getProfessionName(player)
+    local traits = collectTraits(player)
 
     RankLog.info(string.format(
-        "Dados coletados: kills=%d, tempo_min=%d, skills=%d, max=%d, morto=%s, prof=%s",
-        kills, timeRaw, #skillsRaw, maxSkills, tostring(dead), profession))
+        "Dados coletados: kills=%d, tempo_min=%d, skills=%d, max=%d, morto=%s, prof=%s, traits=%d",
+        kills, timeRaw, #skillsRaw, maxSkills, tostring(dead), profession, #traits))
 
     return {
         character_name = getCharacterName(player),
@@ -239,5 +261,6 @@ function RankData.collect(player, isDead)
         skills_raw      = skillsRaw,
         max_skills      = maxSkills,
         is_dead         = dead,
+        traits          = traits,
     }
 end
