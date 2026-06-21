@@ -183,10 +183,11 @@ local function onGenerateRank(worldObjects, playerIndex)
     triggerRank(player, playerIndex, false)
 end
 
-local function onFillWorldContextMenu(playerIndex, context, worldObjects, test)
+-- B42: primeiro arg é o objeto player (não playerIndex como era no B41).
+local function onFillWorldContextMenu(player, context, worldObjects, test)
     if test then return end
-    local player = getSpecificPlayer(playerIndex)
     if not player then return end
+    local playerIndex = player:getPlayerNum()
     context:addOption("Gerar Rank", worldObjects, onGenerateRank, playerIndex)
 end
 
@@ -201,9 +202,9 @@ else
 end
 
 -- ── Atualização + validação ao salvar / sair do mundo ─────
--- OnSave dispara antes de salvar, inclusive ao sair para o menu principal.
+-- B42: OnSave foi substituido por OnPostSave (dispara após o save, inclusive ao sair para o menu).
 pcall(function()
-    Events.OnSave.Add(function()
+    Events.OnPostSave.Add(function()
         if _isStartingUp then return end
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
@@ -263,4 +264,4 @@ Events.OnTick.Add(function()
     silentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado — B42.19+ | v2.0.6")
+RankLog.info("Mod carregado — B42.19+ | v2.0.7")
