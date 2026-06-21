@@ -7,8 +7,10 @@ require "RankMod/RankLog"
 RankData = {}
 
 -- IDs confirmados no B42.19 via probe de Perks[].
--- LongBlunt+ShortBlunt → mesclados em "Blunt" no B42.
--- ShortBlade, Foraging e Knapping: nomes B42 ainda não confirmados (probe em andamento).
+-- Renomeações B42: Lightfooted→Lightfoot, Sneaking→Sneak, LongBlunt→Blunt,
+-- ShortBlunt→SmallBlunt, ShortBlade→SmallBlade, Carpentry→Woodwork,
+-- Electrical→Electricity, Foraging→Survivalist, FirstAid→Doctor,
+-- Agriculture→Farming, Knapping→FlintKnapping, AnimalCare→Husbandry.
 local PERKS = {
     { id = "Sprinting",    nome = "Corrida"             },
     { id = "Lightfoot",    nome = "Pés Leves"           },
