@@ -177,19 +177,36 @@ local function getProfessionName(player)
 end
 
 -- Coleta os traços (traits) do personagem.
--- player:getTraits() retorna ArrayList<String> em B42; iteração segura com pcall.
+-- Em B42.19 o bridge Kahlua NÃO registra player:getTraits() (nil no bridge → log de erro).
+-- Mesma regra de getProfessionName: verifica type() antes de chamar.
+-- Fallback: desc:getTraits() caso o método esteja no descriptor em vez do player.
 -- Os IDs são exportados em inglês (ex: "Athletic", "Smoker") para tradução no site.
 local function collectTraits(player)
     local result = {}
-    local ok, traits = pcall(function() return player:getTraits() end)
-    if not ok or not traits then return result end
 
-    local sizeOk, size = pcall(function() return traits:size() end)
+    local traitList = nil
+
+    if type(player.getTraits) == "function" then
+        local ok, t = pcall(function() return player:getTraits() end)
+        if ok and t then traitList = t end
+    end
+
+    if not traitList then
+        local dOk, desc = pcall(function() return player:getDescriptor() end)
+        if dOk and desc and type(desc.getTraits) == "function" then
+            local tOk, t = pcall(function() return desc:getTraits() end)
+            if tOk and t then traitList = t end
+        end
+    end
+
+    if not traitList then return result end
+
+    local sizeOk, size = pcall(function() return traitList:size() end)
     if not sizeOk or not size or size == 0 then return result end
 
     for i = 0, size - 1 do
         local id
-        local getOk = pcall(function() id = tostring(traits:get(i)) end)
+        local getOk = pcall(function() id = tostring(traitList:get(i)) end)
         if getOk and id and id ~= "" and id ~= "nil" then
             table.insert(result, id)
         end
