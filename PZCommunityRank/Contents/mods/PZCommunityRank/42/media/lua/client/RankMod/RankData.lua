@@ -185,26 +185,33 @@ end
 -- Os IDs são exportados em inglês (ex: "Athletic", "Smoker") para tradução no site.
 local function collectTraits(player)
     local result = {}
-
+    local source = nil
     local traitList = nil
 
     if type(player.getTraits) == "function" then
         local ok, t = pcall(function() return player:getTraits() end)
-        if ok and t then traitList = t end
+        if ok and t then traitList = t; source = "player" end
     end
 
     if not traitList then
         local dOk, desc = pcall(function() return player:getDescriptor() end)
         if dOk and desc and type(desc.getTraits) == "function" then
             local tOk, t = pcall(function() return desc:getTraits() end)
-            if tOk and t then traitList = t end
+            if tOk and t then traitList = t; source = "desc" end
         end
     end
 
-    if not traitList then return result end
+    if not traitList then
+        RankLog.warn("collectTraits: nenhum metodo de traits disponivel no B42 (player.getTraits=" ..
+            tostring(type(player.getTraits)) .. ")")
+        return result
+    end
 
     local sizeOk, size = pcall(function() return traitList:size() end)
-    if not sizeOk or not size or size == 0 then return result end
+    if not sizeOk or not size or size == 0 then
+        RankLog.info("collectTraits: lista vazia via " .. (source or "?"))
+        return result
+    end
 
     for i = 0, size - 1 do
         local id
@@ -213,6 +220,9 @@ local function collectTraits(player)
             table.insert(result, id)
         end
     end
+
+    RankLog.info(string.format("collectTraits: %d traits via %s: %s",
+        #result, source or "?", table.concat(result, ",")))
     return result
 end
 
