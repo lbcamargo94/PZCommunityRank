@@ -263,4 +263,4 @@ Events.OnTick.Add(function()
     silentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado — B42.19+ | v2.0.5")
+RankLog.info("Mod carregado — B42.19+ | v2.0.6")
