@@ -183,11 +183,12 @@ local function onGenerateRank(worldObjects, playerIndex)
     triggerRank(player, playerIndex, false)
 end
 
--- B42: primeiro arg é o objeto player (não playerIndex como era no B41).
-local function onFillWorldContextMenu(player, context, worldObjects, test)
+-- OnFillWorldObjectContextMenu: primeiro arg é o índice do jogador (número inteiro),
+-- não o objeto player — o nome 'player' nas funções do jogo é enganoso.
+local function onFillWorldContextMenu(playerIndex, context, worldObjects, test)
     if test then return end
+    local player = getSpecificPlayer(playerIndex)
     if not player then return end
-    local playerIndex = player:getPlayerNum()
     context:addOption("Gerar Rank", worldObjects, onGenerateRank, playerIndex)
 end
 
@@ -264,4 +265,4 @@ Events.OnTick.Add(function()
     silentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado — B42.19+ | v2.0.7")
+RankLog.info("Mod carregado — B42.19+ | v2.0.9")
