@@ -27,3 +27,4 @@ description=
 description=Boa sorte sobrevivente. Sua história será lembrada.
 tags=Build 42;Interface
 visibility=public
+mods=PZCommunityRank
