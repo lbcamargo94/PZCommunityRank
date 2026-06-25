@@ -102,8 +102,7 @@ local RULES = {
     { key = "NatureAbundance",expected = 1, label = "Natureza (Muito Ruim=1)" },
 
     -- [ AMBIENTE ]
-    { key = "MetaEvent",        expected = 3,     label = "Eventos Aleatórios (Freq.=3)" },
-    { key = "Map.AllowMiniMap", expected = false,  label = "Mini-Mapa Desativado" },
+    { key = "MetaEvent", expected = 3, label = "Eventos Aleatórios (Freq.=3)" },
 
     -- [ PERSONAGEM ]
     { key = "MultiplierConfig.Global", expected = 0.8, label = "Mult. XP Global (0.8)", tol = 0.05 },
