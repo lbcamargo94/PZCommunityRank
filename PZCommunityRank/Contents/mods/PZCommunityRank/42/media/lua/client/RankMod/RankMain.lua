@@ -8,6 +8,7 @@ require "RankMod/RankCode"
 require "RankMod/RankUI"
 require "RankMod/RankFile"
 require "RankMod/RankSandbox"
+require "RankMod/RankSandboxExport"
 
 RankMain = {}
 RankMain.submitted = {}
@@ -61,6 +62,8 @@ local function triggerRank(player, playerIndex, isDead)
     end
 
     RankFile.save(entry, code)
+    -- Exporta sandbox em arquivo separado — independente do PZRX2
+    pcall(function() RankSandboxExport.export(entry.character_name) end)
     RankSubmitUI.open(entry, code, playerIndex)
 end
 
@@ -86,6 +89,7 @@ local function silentUpdate(player, playerIndex)
     _lastSilentCode = code
 
     RankFile.save(entry, code)
+    pcall(function() RankSandboxExport.export(entry.character_name) end)
     RankLog.info("silentUpdate: arquivo gerado sem UI")
 end
 
@@ -265,4 +269,4 @@ Events.OnTick.Add(function()
     silentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado — B42.19+ | v2.0.9")
+RankLog.info("Mod carregado — B42.19+ | v2.0.10")
