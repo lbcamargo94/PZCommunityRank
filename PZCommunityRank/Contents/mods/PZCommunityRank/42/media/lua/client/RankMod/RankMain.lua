@@ -142,6 +142,7 @@ local function onGameStart()
     RankMain.submitted = {}
     _killsSinceSync    = 0
     _lastSilentCode    = nil
+    _periodicTick      = 0
     RankLog.info("OnGameStart: submissoes resetadas.")
 
     -- Grace period: bloqueia OnPlayerDeath nos primeiros 120 ticks para evitar
