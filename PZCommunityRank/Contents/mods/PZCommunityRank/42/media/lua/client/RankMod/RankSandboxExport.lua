@@ -96,6 +96,12 @@ local function encodeVal(val, depth)
     return 'null'
 end
 
+-- Kahlua não implementa next() — usa pairs() para verificar tabela não-vazia
+local function tableHasItems(t)
+    for _ in pairs(t) do return true end
+    return false
+end
+
 -- ── Captura segura de SandboxVars ────────────────────────────────────────────
 -- Percorre dinamicamente todas as categorias disponíveis.
 -- Categorias que falharem ao iterar são ignoradas (pcall em cada).
@@ -128,7 +134,7 @@ local function captureSandbox()
                                         sub2[k2] = v2
                                     end
                                 end
-                                if next(sub2) ~= nil then sub[k] = sub2 end
+                                if tableHasItems(sub2) then sub[k] = sub2 end
                             end
                         end
                     end
@@ -136,7 +142,7 @@ local function captureSandbox()
                 if not ok then
                     RankLog.warn("RankSandboxExport: erro ao iterar " .. catKey .. ": " .. tostring(err))
                 end
-                if next(sub) ~= nil then result[catKey] = sub end
+                if tableHasItems(sub) then result[catKey] = sub end
 
             elseif t == 'number' or t == 'boolean' or t == 'string' then
                 -- Valor primitivo no nível raiz
