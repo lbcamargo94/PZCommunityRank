@@ -20,16 +20,22 @@ local MAX_DEPTH = 10
 
 local function escapeStr(s)
     s = tostring(s)
-    s = s:gsub('\\', '\\\\')
-    s = s:gsub('"',  '\\"')
-    s = s:gsub('\n', '\\n')
-    s = s:gsub('\r', '\\r')
-    s = s:gsub('\t', '\\t')
-    -- Remove bytes de controle (0x00–0x1F exceto já escapados)
-    s = s:gsub('[\000-\031]', function(c)
-        return string.format('\\u%04x', string.byte(c))
-    end)
-    return '"' .. s .. '"'
+    -- Kahlua nao suporta classes de caracteres com bytes nulos em gsub
+    -- (ex: '[\000-\031]' lanca "malformed pattern") — usa loop char-a-char
+    local out = {}
+    for i = 1, #s do
+        local c = s:sub(i, i)
+        local b = string.byte(c)
+        if     c == '\\' then out[#out+1] = '\\\\'
+        elseif c == '"'  then out[#out+1] = '\\"'
+        elseif c == '\n' then out[#out+1] = '\\n'
+        elseif c == '\r' then out[#out+1] = '\\r'
+        elseif c == '\t' then out[#out+1] = '\\t'
+        elseif b < 32    then out[#out+1] = string.format('\\u%04x', b)
+        else                  out[#out+1] = c
+        end
+    end
+    return '"' .. table.concat(out) .. '"'
 end
 
 local function encodeVal(val, depth)
