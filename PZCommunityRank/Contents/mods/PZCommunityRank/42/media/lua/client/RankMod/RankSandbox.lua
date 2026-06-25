@@ -98,8 +98,8 @@ local RULES = {
     { key = "NightDarkness",  expected = 2, label = "Escuridão Noite (Escuro=2)" },
     { key = "Temperature",    expected = 2, label = "Temperatura (Frio=2)" },
     { key = "Rain",           expected = 2, label = "Chuva (Seco=2)" },
-    { key = "FishAbundance",  expected = 5, label = "Pesca (Muito Abundante=5)" },
-    { key = "NatureAbundance",expected = 5, label = "Natureza (Muito Abundante=5)" },
+    { key = "FishAbundance",  expected = 1, label = "Pesca (Muito Ruim=1)" },
+    { key = "NatureAbundance",expected = 1, label = "Natureza (Muito Ruim=1)" },
 
     -- [ AMBIENTE ]
     { key = "MetaEvent",        expected = 3,     label = "Eventos Aleatórios (Freq.=3)" },
