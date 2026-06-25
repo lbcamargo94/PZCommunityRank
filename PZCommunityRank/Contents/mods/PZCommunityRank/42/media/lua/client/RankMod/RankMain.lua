@@ -26,7 +26,7 @@ local PERIODIC_TICKS = 18000
 
 -- Contador de kills desde o último silentUpdate por kills.
 local _killsSinceSync = 0
-local KILLS_PER_SYNC  = 10   -- dispara sync a cada 10 kills
+local KILLS_PER_SYNC  = 5    -- dispara sync a cada 5 kills
 
 -- Coleta dados, gera código, salva arquivo e abre a UI de resultado.
 -- O Companion (app externo) faz o sync via arquivo — nenhuma rede aqui.
@@ -71,6 +71,7 @@ RankMain.triggerRank = triggerRank
 
 -- Salva arquivo sem abrir UI — usada em saves periódicos e ao sair do mundo.
 -- Deduplicação via código: se o estado não mudou, não gera novo arquivo.
+-- IMPORTANTE: chamada sempre dentro de pcall para não desregistrar handlers de evento.
 local function silentUpdate(player, playerIndex)
     playerIndex = playerIndex or 0
     if RankMain.submitted[playerIndex] then return end  -- jogador já morreu neste run
@@ -85,12 +86,23 @@ local function silentUpdate(player, playerIndex)
     local code = RankCode.generate(entry)
     if not RankCode.isValid(code) then return end
 
-    if code == _lastSilentCode then return end  -- estado não mudou
+    if code == _lastSilentCode then
+        RankLog.info("silentUpdate: estado inalterado, arquivo nao regravado")
+        return
+    end
     _lastSilentCode = code
 
     RankFile.save(entry, code)
     pcall(function() RankSandboxExport.export(entry.character_name) end)
-    RankLog.info("silentUpdate: arquivo gerado sem UI")
+    RankLog.info("silentUpdate: arquivo sincronizado — " .. (entry.character_name or "?"))
+end
+
+-- Wrapper seguro: garante que silentUpdate nao pode crashar o handler do evento.
+local function safeSilentUpdate(player, playerIndex)
+    local ok, err = pcall(silentUpdate, player, playerIndex)
+    if not ok then
+        RankLog.error("silentUpdate falhou (protegido): " .. tostring(err))
+    end
 end
 
 local function isLocalPlayer(player)
@@ -156,9 +168,10 @@ local function onGameStart()
             _isStartingUp = false
             pcall(function() Events.OnTick.Remove(clearStartup) end)
             -- Sync inicial + validação de sandbox após carregamento estável.
+            RankLog.info("OnGameStart: grace period concluido — sync inicial")
             local ok, player = pcall(getPlayer)
             if ok and player and isLocalPlayer(player) then
-                silentUpdate(player, 0)
+                safeSilentUpdate(player, 0)
             end
             pcall(function() RankSandbox.check(false) end)
         end
@@ -212,10 +225,11 @@ end
 pcall(function()
     Events.OnPostSave.Add(function()
         if _isStartingUp then return end
+        RankLog.info("OnPostSave: disparando sync")
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
-        silentUpdate(player, 0)
+        safeSilentUpdate(player, 0)
         pcall(function() RankSandbox.check(false) end)
     end)
 end)
@@ -225,24 +239,26 @@ end)
 pcall(function()
     Events.LevelPerk.Add(function(...)
         if _isStartingUp then return end
+        RankLog.info("LevelPerk: disparando sync")
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
-        silentUpdate(player, 0)
+        safeSilentUpdate(player, 0)
     end)
 end)
 
--- ── Atualização ao matar um zumbi (debounce: 1 sync a cada 10 kills) ──
+-- ── Atualização ao matar um zumbi (debounce: 1 sync a cada 5 kills) ──
 pcall(function()
     Events.OnZombieDead.Add(function(zombie)
         if _isStartingUp then return end
         _killsSinceSync = _killsSinceSync + 1
         if _killsSinceSync < KILLS_PER_SYNC then return end
         _killsSinceSync = 0
+        RankLog.info("OnZombieDead: " .. KILLS_PER_SYNC .. " kills — disparando sync")
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
-        silentUpdate(player, 0)
+        safeSilentUpdate(player, 0)
     end)
 end)
 
@@ -250,10 +266,11 @@ end)
 pcall(function()
     Events.EveryDays.Add(function()
         if _isStartingUp then return end
+        RankLog.info("EveryDays: novo dia — disparando sync")
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
-        silentUpdate(player, 0)
+        safeSilentUpdate(player, 0)
     end)
 end)
 
@@ -264,10 +281,11 @@ Events.OnTick.Add(function()
     _periodicTick = 0
 
     if _isStartingUp then return end
+    RankLog.info("Periodic: ~5 min — disparando sync")
     local ok, player = pcall(getPlayer)
     if not ok or not player then return end
     if not isLocalPlayer(player) then return end
-    silentUpdate(player, 0)
+    safeSilentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado — B42.19+ | v2.1.3")
+RankLog.info("Mod carregado — B42.19+ | v2.1.4")
