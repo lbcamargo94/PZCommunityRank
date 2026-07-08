@@ -43,12 +43,17 @@ RankLog.info("RankGameMode: modo '" .. MODE_TITLE .. "' registrado.")
 --  O botao "Next" da NewGameScreen chama self:clickPlay().
 --  Quando o jogador confirma o modo BRASILEIRAO PZ:
 --
---  1. Remapeia mode para "Apocalypse" antes do original para que:
---     a) setGameMode() receba um enum valido
---     b) O jogo pule a tela de sandbox options e va direto ao spawn select
---  2. Chama o original (clickPlay aplica o preset "Apocalypse" em linha 436)
---  3. Restaura mode e aplica nosso preset por cima — assim as configuracoes
---     do BrasileiraoChallenge.lua ficam ativas quando o mundo for criado.
+--  1. Remapeia mode para "Sandbox" antes do original.
+--     Com Sandbox, clickPlay chama fillList() em modo Sandbox e exibe TODOS
+--     os mapas do B42 (que tem only_for_game_mode=Sandbox em map.info).
+--     Alem disso, clickPlay nao sobrescreve nosso preset (linha 435 e ignorada
+--     quando mode == Sandbox).
+--
+--  2. Apos clickPlay: aplica nosso preset (sobrepoe setDefaultSandboxVars),
+--     depois muda getGameMode() de volta para Apocalypse. Com isso, quando
+--     o jogador clicar "Next" no spawn select, clickNext (linha 652) ve
+--     getGameMode() != "Sandbox" e vai direto para criacao de personagem,
+--     pulando a tela de opcoes de sandbox.
 
 local _origClickPlay = NewGameScreen.clickPlay
 
@@ -58,13 +63,16 @@ NewGameScreen.clickPlay = function(self)
                       and self.selectedItem.data.mode == MODE_ID
 
     if isBrasileirao then
-        self.selectedItem.data.mode = GameMode.APOCALYPSE:toString()
+        -- Sandbox: fillList() exibe todos os mapas, linha 435 nao sobrescreve preset
+        self.selectedItem.data.mode = GameMode.SANDBOX:toString()
     end
 
     _origClickPlay(self)
 
     if isBrasileirao then
         self.selectedItem.data.mode = MODE_ID
+
+        -- Aplica nosso preset apos setDefaultSandboxVars() do clickPlay
         local ok, err = pcall(function()
             local preset = MainScreen.instance.sandOptions:getSandboxPreset(MODE_ID)
             MainScreen.instance:setSandboxPreset(preset)
@@ -74,6 +82,14 @@ NewGameScreen.clickPlay = function(self)
         else
             RankLog.warn("RankGameMode: erro ao aplicar preset: " .. tostring(err))
         end
+
+        -- Volta para Apocalypse: fillList ja rodou em Sandbox (lista populada),
+        -- agora clickNext vera getGameMode() != "Sandbox" e vai para char creation
+        -- sem mostrar a tela de opcoes de sandbox.
+        pcall(function()
+            getWorld():setGameMode(GameMode.APOCALYPSE:toString())
+        end)
+        RankLog.info("RankGameMode: modo revertido para Apocalypse (spawn select aberto).")
     end
 end
 
