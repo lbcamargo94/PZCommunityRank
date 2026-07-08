@@ -1,5 +1,5 @@
 -- ============================================================
---  RankGameMode.lua — Modo BRASILEIRAO PZ na tela de Nova Partida
+--  RankGameMode.lua - Modo BRASILEIRAO PZ na tela de Nova Partida
 --
 --  Injeta uma entrada na lista de modos do NewGameScreen.
 --  Ao selecionar, aplica automaticamente BrasileiraoChallenge.lua
@@ -9,7 +9,7 @@
 
 require "RankMod/RankLog"
 
--- ── Constantes ────────────────────────────────────────────────────────────
+-- Constantes
 
 local MODE_ID    = "BrasileiraoChallenge"
 local MODE_TITLE = "BRASILEIRAO PZ"
@@ -18,14 +18,14 @@ local MODE_DESC  = "Desafio oficial de sobrevivencia."
                 .. " Crie seu personagem, escolha o spawn e comece a sobreviver."
 local MODE_THUMB = "media/textures/BrasileiraoThumb.png"
 
--- ── Injeção na lista de modos ─────────────────────────────────────────────
+-- Injecao na lista de modos
 --
---  NewGameScreen.defaultGameModeData é definido em NewGameScreen.lua
---  no nível do módulo. Como arquivos de mods carregam após os vanilla,
---  a tabela já existe quando este arquivo é executado.
+--  NewGameScreen.defaultGameModeData e definido em NewGameScreen.lua
+--  no nivel do modulo. Como arquivos de mods carregam apos os vanilla,
+--  a tabela ja existe quando este arquivo e executado.
 
 if not (NewGameScreen and NewGameScreen.defaultGameModeData) then
-    RankLog.warn("RankGameMode: NewGameScreen nao disponivel — modo nao registrado.")
+    RankLog.warn("RankGameMode: NewGameScreen nao disponivel - modo nao registrado.")
     return
 end
 
@@ -38,7 +38,7 @@ table.insert(NewGameScreen.defaultGameModeData, 1, {
 
 RankLog.info("RankGameMode: modo '" .. MODE_TITLE .. "' registrado.")
 
--- ── Hook: clickPlay ──────────────────────────────────────────────────────
+-- Hook: clickPlay
 --
 --  O botao "Next" da NewGameScreen chama self:clickPlay().
 --  Quando o jogador confirma o modo BRASILEIRAO PZ:
@@ -46,7 +46,7 @@ RankLog.info("RankGameMode: modo '" .. MODE_TITLE .. "' registrado.")
 --  1. Remapeia mode para "Sandbox" antes do original.
 --     Com Sandbox, clickPlay chama fillList() em modo Sandbox e exibe TODOS
 --     os mapas do B42 (que tem only_for_game_mode=Sandbox em map.info).
---     Alem disso, clickPlay nao sobrescreve nosso preset (linha 435 e ignorada
+--     Alem disso, clickPlay nao sobrescreve nosso preset (linha 435 ignorada
 --     quando mode == Sandbox).
 --
 --  2. Apos clickPlay: aplica nosso preset (sobrepoe setDefaultSandboxVars),
@@ -63,6 +63,10 @@ NewGameScreen.clickPlay = function(self)
                       and self.selectedItem.data.mode == MODE_ID
 
     if isBrasileirao then
+        -- Sinaliza para o OnGameStart que este e um novo jogo BRASILEIRAO.
+        -- O flag persiste na sessao Lua ate ser lido e zerado no grace period.
+        _RankMod_PendingBrasileiraoSetup = true
+
         -- Sandbox: fillList() exibe todos os mapas, linha 435 nao sobrescreve preset
         self.selectedItem.data.mode = GameMode.SANDBOX:toString()
     end

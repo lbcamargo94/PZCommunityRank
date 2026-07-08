@@ -1,17 +1,17 @@
 -- ============================================================
---  BrasileiraoChallenge.lua — Preset Sandbox do BRASILEIRÃO PZ
+--  BrasileiraoChallenge.lua - Preset Sandbox do BRASILEIRAO PZ
 --
 --  Carregado automaticamente pelo jogo via getSandboxPreset()
---  quando o jogador seleciona o modo BRASILEIRÃO PZ na tela
+--  quando o jogador seleciona o modo BRASILEIRAO PZ na tela
 --  de Nova Partida.
 --
---  Valores extraídos do preset oficial "Brasileirão PZ.cfg"
+--  Valores extraidos do preset oficial "Brasileirao PZ.cfg"
 --  e mantidos em sincronia com RankSandbox.lua.
 -- ============================================================
 return {
     Version = 6,
 
-    -- ── ZUMBIS — População ────────────────────────────────
+    -- ZUMBIS - Populacao
     ZombieConfig = {
         PopulationMultiplier      = 4.0,
         PopulationStartMultiplier = 2.0,
@@ -30,20 +30,20 @@ return {
         ZombiesCountBeforeDelete  = 300,
     },
 
-    -- ── ZUMBIS — Comportamento ────────────────────────────
+    -- ZUMBIS - Comportamento
     ZombieLore = {
-        Speed                    = 4,   -- Aleatório
+        Speed                    = 4,   -- Aleatorio
         SprinterPercentage       = 0,   -- Nenhum corredor
         Strength                 = 1,   -- Super-humano
         Toughness                = 1,   -- Resistente
         Transmission             = 1,
         Mortality                = 5,
         Reanimate                = 3,
-        Cognition                = 1,   -- Avançado (abre portas)
+        Cognition                = 1,   -- Avancado (abre portas)
         DoorOpeningPercentage    = 0,
         CrawlUnderVehicle        = 5,
         Memory                   = 1,   -- Longa
-        Sight                    = 1,   -- Águia
+        Sight                    = 1,   -- Aguia
         Hearing                  = 1,   -- Alta
         SpottedLogic             = true,
         ThumpNoChasing           = false,
@@ -63,7 +63,7 @@ return {
         FenceDamageMultiplier    = 1.0,
     },
 
-    -- ── LOOT — todas as categorias em 0.04 (Muito Baixo) ──
+    -- LOOT - todas as categorias em 0.04 (Muito Baixo)
     FoodLootNew          = 0.04,
     LiteratureLootNew    = 0.04,
     SkillBookLoot        = 0.04,
@@ -96,7 +96,7 @@ return {
     CommonLootFactor     = 2.0,
     AbundantLootFactor   = 3.0,
 
-    -- ── MUNDO ─────────────────────────────────────────────
+    -- MUNDO
     Zombies              = 4,
     Distribution         = 1,
     ZombieVoronoiNoise   = true,
@@ -110,14 +110,14 @@ return {
     DayNightCycle        = 1,
     ClimateCycle         = 1,
     FogCycle             = 1,
-    WaterShut            = 1,   -- Instantâneo
-    ElecShut             = 1,   -- Instantâneo
+    WaterShut            = 1,   -- Instantaneo
+    ElecShut             = 1,   -- Instantaneo
     WaterShutModifier    = 0,
     ElecShutModifier     = 0,
-    AlarmDecay           = 6,   -- 0–5 Anos
+    AlarmDecay           = 6,   -- 0-5 Anos
     AlarmDecayModifier   = 0,
 
-    -- ── TEMPO / NATUREZA ──────────────────────────────────
+    -- TEMPO / NATUREZA
     Temperature          = 2,   -- Frio
     Rain                 = 2,   -- Seco
     NightDarkness        = 2,   -- Escuro
@@ -131,14 +131,14 @@ return {
     PlantResilience      = 3,
     PlantAbundance       = 3,
 
-    -- ── EVENTOS ───────────────────────────────────────────
+    -- EVENTOS
     Alarm                = 6,   -- Muito Frequentemente
     LockedHouses         = 6,
     Helicopter           = 2,
     MetaEvent            = 3,   -- Frequentemente
     SleepingEvent        = 1,
 
-    -- ── PERSONAGEM ────────────────────────────────────────
+    -- PERSONAGEM
     StarterKit           = false,
     Nutrition            = true,
     StatsDecrease        = 3,
@@ -164,7 +164,7 @@ return {
     LevelForMediaXPCutoff    = 3,
     LevelForDismantleXPCutoff = 0,
 
-    -- ── MULTIPLICADORES XP ────────────────────────────────
+    -- MULTIPLICADORES XP
     MultiplierConfig = {
         Global         = 0.8,
         GlobalToggle   = true,
@@ -205,7 +205,7 @@ return {
         Glassmaking    = 1.0,
     },
 
-    -- ── VEÍCULOS ──────────────────────────────────────────
+    -- VEICULOS
     EnableVehicles       = true,
     CarSpawnRate         = 3,
     ChanceHasGas         = 1,   -- Baixo
@@ -228,14 +228,14 @@ return {
     VehicleEasyUse       = false,
     SirenEffectsZombies  = true,
 
-    -- ── GERADOR / LOOT ESPECIAL ───────────────────────────
+    -- GERADOR / LOOT ESPECIAL
     GeneratorFuelConsumption = 0.1,
     GeneratorSpawning    = 1,   -- Extremamente Raro
     GeneratorTileRange   = 20,
     GeneratorVerticalPowerRange = 3,
     AnnotatedMapChance   = 4,
 
-    -- ── ANIMAIS ───────────────────────────────────────────
+    -- ANIMAIS
     AnimalStatsModifier      = 4,
     AnimalMetaStatsModifier  = 4,
     AnimalPregnancyTime      = 4,
@@ -251,7 +251,7 @@ return {
     AnimalTrackChance        = 4,
     AnimalPathChance         = 4,
 
-    -- ── AMBIENTE ──────────────────────────────────────────
+    -- AMBIENTE
     FireSpread           = true,
     HoursForCorpseRemoval = 216.0,
     DecayingCorpseHealthImpact = 3,
@@ -298,7 +298,7 @@ return {
     MaximumDiminishedLoot = 20,
     DaysUntilMaximumDiminishedLoot = 3650,
 
-    -- ── ARMAS DE FOGO ─────────────────────────────────────
+    -- ARMAS DE FOGO
     FirearmUseDamageChance   = 2,
     FirearmNoiseMultiplier   = 1.0,
     FirearmJamMultiplier     = 1.0,
@@ -306,7 +306,7 @@ return {
     FirearmWeatherMultiplier = 1.0,
     FirearmHeadGearEffect    = true,
 
-    -- ── MAPA ──────────────────────────────────────────────
+    -- MAPA
     Map = {
         AllowMiniMap  = true,
         AllowWorldMap = true,
@@ -314,7 +314,7 @@ return {
         MapNeedsLight = true,
     },
 
-    -- ── PORÃO ─────────────────────────────────────────────
+    -- PORAO
     Basement = {
         SpawnFrequency = 4,
     },

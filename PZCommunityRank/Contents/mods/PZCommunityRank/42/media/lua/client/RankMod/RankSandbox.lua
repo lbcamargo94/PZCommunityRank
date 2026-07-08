@@ -175,7 +175,87 @@ function RankSandbox.validate()
     return violations, missing
 end
 
--- ── API pública ────────────────────────────────────────────────────────────
+-- ── Escrita de sub-tabelas via path com pontos ─────────────────────────────
+--  Espelho de readVar, mas atribuindo em vez de lendo.
+
+local function writeVar(key, value)
+    local ok, err = pcall(function()
+        local t = SandboxVars
+        local parts = {}
+        for part in key:gmatch("[^.]+") do
+            table.insert(parts, part)
+        end
+        for i = 1, #parts - 1 do
+            local p  = parts[i]
+            local tt = type(t)
+            if tt ~= "table" and tt ~= "userdata" then
+                error("container '" .. p .. "' nao e tabela (type=" .. tt .. ")")
+            end
+            t = t[p]
+        end
+        if t == nil then
+            error("container nulo para chave: " .. key)
+        end
+        t[parts[#parts]] = value
+    end)
+    return ok, err
+end
+
+-- Aplica todos os valores do RULES ao SandboxVars e sincroniza com Java.
+function RankSandbox.applyRules()
+    local applied = 0
+    local failed  = 0
+    for _, rule in ipairs(RULES) do
+        local ok, err = writeVar(rule.key, rule.expected)
+        if ok then
+            applied = applied + 1
+        else
+            failed = failed + 1
+            RankLog.warn("applyRules: falha em " .. rule.key .. ": " .. tostring(err))
+        end
+    end
+    -- Sincroniza SandboxVars (Lua) -> SandboxOptions (Java).
+    -- Garante que o motor de jogo use os valores corrigidos.
+    pcall(function() getSandboxOptions():fromLua() end)
+    RankLog.info(string.format("applyRules: %d/%d aplicados, %d falhos.", applied, #RULES, failed))
+    return applied
+end
+
+-- Verifica o sandbox e corrige automaticamente qualquer divergencia.
+-- Retorna true se o sandbox esta OK apos a operacao.
+function RankSandbox.verifyAndCorrect()
+    RankLog.info("verifyAndCorrect: verificando configuracoes do desafio...")
+    local v1, _ = RankSandbox.validate()
+
+    if #v1 == 0 then
+        RankLog.info("verifyAndCorrect: sandbox OK — nenhuma correcao necessaria.")
+        return true
+    end
+
+    RankLog.warn(string.format("verifyAndCorrect: %d divergencia(s) detectada(s) — corrigindo.", #v1))
+    for _, v in ipairs(v1) do
+        RankLog.warn(string.format("  X  %s: esperado=%s atual=%s",
+            v.label, tostring(v.expected), tostring(v.got)))
+    end
+
+    RankSandbox.applyRules()
+
+    -- Segunda verificacao para confirmar que correcoes foram aplicadas.
+    local v2, _ = RankSandbox.validate()
+    if #v2 == 0 then
+        RankLog.info("verifyAndCorrect: correcoes aplicadas com sucesso. Sandbox OK.")
+        return true
+    end
+
+    RankLog.warn(string.format("verifyAndCorrect: %d divergencia(s) persistem apos correcao.", #v2))
+    for _, v in ipairs(v2) do
+        RankLog.warn(string.format("  !  %s: esperado=%s atual=%s",
+            v.label, tostring(v.expected), tostring(v.got)))
+    end
+    return false
+end
+
+-- ── API publica ─────────────────────────────────────────────────────────────
 
 function RankSandbox.check(showMissing)
     local violations, missing = RankSandbox.validate()

@@ -175,6 +175,38 @@ local function onGameStart()
                 safeSilentUpdate(player, 0)
             end
             pcall(function() RankSandbox.check(false) end)
+
+            -- Detecta se este e um jogo do desafio BRASILEIRAO e verifica/corrige sandbox.
+            --
+            -- Novo jogo: _RankMod_PendingBrasileiraoSetup e verdadeiro (setado em RankGameMode
+            -- durante clickPlay). Marcamos o save via ModData e zeramos o flag.
+            --
+            -- Save carregado: verificamos o ModData gravado na sessao anterior.
+            local isChallengeGame = false
+
+            if _RankMod_PendingBrasileiraoSetup then
+                _RankMod_PendingBrasileiraoSetup = nil
+                isChallengeGame = true
+                pcall(function()
+                    local p2 = getPlayer()
+                    if p2 then
+                        p2:getModData()["PZCommunityRank_IsChallenge"] = true
+                    end
+                end)
+                RankLog.info("OnGameStart: novo jogo BRASILEIRAO — marcado como desafio.")
+            else
+                pcall(function()
+                    local p2 = getPlayer()
+                    if p2 and p2:getModData()["PZCommunityRank_IsChallenge"] then
+                        isChallengeGame = true
+                        RankLog.info("OnGameStart: save do desafio BRASILEIRAO detectado.")
+                    end
+                end)
+            end
+
+            if isChallengeGame then
+                pcall(function() RankSandbox.verifyAndCorrect() end)
+            end
         end
     end
     pcall(function() Events.OnTick.Add(clearStartup) end)
@@ -289,4 +321,4 @@ Events.OnTick.Add(function()
     safeSilentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado — B42.19+ | v2.1.4")
+RankLog.info("Mod carregado — B42.19+ | v2.2.2")
