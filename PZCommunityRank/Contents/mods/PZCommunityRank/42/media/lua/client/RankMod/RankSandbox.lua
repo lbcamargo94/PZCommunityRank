@@ -1,23 +1,23 @@
 -- ============================================================
---  RankSandbox.lua — Validador de configurações do Sandbox (B42.19+)
+--  RankSandbox.lua - Validador de configuracoes do Sandbox (B42.19+)
 --
 --  Compara o SandboxVars ativo com as regras do desafio oficial.
 --  Abre um ISPanel de alerta quando algo diverge.
---  Não bloqueia o jogo — apenas avisa.
+--  Nao bloqueia o jogo - apenas avisa.
 --
---  Enums reais do B42.19 (extraídos do preset "Brasileirão PZ.cfg"):
+--  Enums reais do B42.19 (extraidos do preset "Brasileirao PZ.cfg"):
 --
---  ZombieLore.Speed:        1=Corredores  2=Normal  3=Lento  4=Aleatório
---  ZombieLore.Strength:     1=Super-humano  2=Normal  3=Fraco  4=Aleatório
---  ZombieLore.Toughness:    1=Resistente    2=Normal  3=Frágil 4=Aleatório
+--  ZombieLore.Speed:        1=Corredores  2=Normal  3=Lento  4=Aleatorio
+--  ZombieLore.Strength:     1=Super-humano  2=Normal  3=Fraco  4=Aleatorio
+--  ZombieLore.Toughness:    1=Resistente    2=Normal  3=Fragil 4=Aleatorio
 --  ZombieLore.Hearing:      1=Alta  2=Normal  3=Baixa  4=Aleat.  5=Aleat.(Normal/Ruim)
---  ZombieLore.Sight:        1=Águia 2=Normal  3=Ruim   4=Aleat.  5=Aleat.(Normal/Ruim)
+--  ZombieLore.Sight:        1=Aguia 2=Normal  3=Ruim   4=Aleat.  5=Aleat.(Normal/Ruim)
 --  ZombieLore.Memory:       1=Longo 2=Normal  3=Curto  4=Nenhum  5=Aleat.
---  ZombieLore.Cognition:    1=Avançado(abre portas) 2=Normal 3=Básico 4=Aleat.
+--  ZombieLore.Cognition:    1=Avancado(abre portas) 2=Normal 3=Basico 4=Aleat.
 --  ZombieLore.DisableFakeDead: 1=Parcial 2=Total(incl.mortos pelo jogador) 3=Nenhum
---  ZombieLore.CrawlUnderVehicle: 1=SóRastejantes 2=ExtRaro..7=Sempre
---  WaterShut / ElecShut:    1=Instantâneo 2=0-30 Dias ...
---  AlarmDecay:              1=Instantâneo .. 6=0-5 Anos
+--  ZombieLore.CrawlUnderVehicle: 1=SoRastejantes 2=ExtRaro..7=Sempre
+--  WaterShut / ElecShut:    1=Instantaneo 2=0-30 Dias ...
+--  AlarmDecay:              1=Instantaneo .. 6=0-5 Anos
 --  Alarm:                   1=Nunca .. 6=Muito Frequentemente
 --  NightDarkness:           1=Comp.Escuro  2=Escuro  3=Normal  4=Claro
 --  Temperature:             1=Muito Frio   2=Frio    3=Normal  4=Quente  5=M.Quente
@@ -36,35 +36,35 @@ require "RankMod/RankLog"
 
 RankSandbox = {}
 
--- ── Regras do Desafio Oficial ──────────────────────────────────────────────
+-- -- Regras do Desafio Oficial ----------------------------------------------
 --
 --  key:      caminho no SandboxVars (pontos indicam sub-tabela)
---  expected: valor esperado (número, booleano ou string)
---  tol:      tolerância para floats (padrão 0.01)
+--  expected: valor esperado (numero, booleano ou string)
+--  tol:      tolerancia para floats (padrao 0.01)
 
 local RULES = {
-    -- [ ZUMBIS — População ]
+    -- [ ZUMBIS - Populacao ]
     { key = "ZombieConfig.PopulationMultiplier",       expected = 4.0, label = "Pop. Multiplicador",         tol = 0.05 },
     { key = "ZombieConfig.PopulationStartMultiplier",  expected = 2.0, label = "Pop. Inicial",                tol = 0.05 },
     { key = "ZombieConfig.PopulationPeakMultiplier",   expected = 2.0, label = "Pop. Pico",                   tol = 0.05 },
     { key = "ZombieConfig.PopulationPeakDay",          expected = 1,   label = "Dia do Pico" },
 
-    -- [ ZUMBIS — Comportamento ]
-    -- Speed 4=Aleatório; SprinterPercentage=0 garante "nenhum corredor"
-    { key = "ZombieLore.Speed",                        expected = 4,    label = "Velocidade (Aleatório=4)" },
+    -- [ ZUMBIS - Comportamento ]
+    -- Speed 4=Aleatorio; SprinterPercentage=0 garante "nenhum corredor"
+    { key = "ZombieLore.Speed",                        expected = 4,    label = "Velocidade (Aleatorio=4)" },
     { key = "ZombieLore.SprinterPercentage",           expected = 0,    label = "% Corredores (0)" },
-    { key = "ZombieLore.Strength",                     expected = 1,    label = "Força (Super-humano=1)" },
-    { key = "ZombieLore.Toughness",                    expected = 1,    label = "Resistência (Resistente=1)" },
-    { key = "ZombieLore.Hearing",                      expected = 1,    label = "Audição (Alta=1)" },
-    { key = "ZombieLore.Sight",                        expected = 1,    label = "Visão (Águia=1)" },
-    { key = "ZombieLore.Memory",                       expected = 1,    label = "Memória (Longa=1)" },
-    { key = "ZombieLore.Cognition",                    expected = 1,    label = "Percepção/Portas (Avançado=1)" },
-    { key = "ZombieConfig.FollowSoundDistance",        expected = 100,  label = "Raio de Audição (100)" },
+    { key = "ZombieLore.Strength",                     expected = 1,    label = "Forca (Super-humano=1)" },
+    { key = "ZombieLore.Toughness",                    expected = 1,    label = "Resistencia (Resistente=1)" },
+    { key = "ZombieLore.Hearing",                      expected = 1,    label = "Audicao (Alta=1)" },
+    { key = "ZombieLore.Sight",                        expected = 1,    label = "Visao (Aguia=1)" },
+    { key = "ZombieLore.Memory",                       expected = 1,    label = "Memoria (Longa=1)" },
+    { key = "ZombieLore.Cognition",                    expected = 1,    label = "Percepcao/Portas (Avancado=1)" },
+    { key = "ZombieConfig.FollowSoundDistance",        expected = 100,  label = "Raio de Audicao (100)" },
     { key = "ZombieLore.DisableFakeDead",              expected = 2,    label = "Fake Dead Total (2)" },
     { key = "ZombieLore.ZombiesCrawlersDragDown",      expected = true, label = "Rastejadores Derrubam" },
     { key = "ZombieConfig.RallyGroupSize",             expected = 1,    label = "Tamanho da Horda (1)" },
 
-    -- [ LOOT ] — todas as 22 categorias do B42 (0.04 = Muito Baixo)
+    -- [ LOOT ] - todas as 22 categorias do B42 (0.04 = Muito Baixo)
     { key = "FoodLootNew",          expected = 0.04, label = "Comida",                  tol = 0.01 },
     { key = "CannedFoodLootNew",    expected = 0.04, label = "Comida Enlatada",          tol = 0.01 },
     { key = "WeaponLootNew",        expected = 0.04, label = "Armas Corpo a Corpo",      tol = 0.01 },
@@ -89,38 +89,38 @@ local RULES = {
     { key = "GeneratorSpawning",    expected = 1,    label = "Geradores (Ext.Raro=1)" },
 
     -- [ MUNDO ]
-    { key = "WaterShut",  expected = 1, label = "Água Instantânea (1)" },
-    { key = "ElecShut",   expected = 1, label = "Eletric. Instantânea (1)" },
+    { key = "WaterShut",  expected = 1, label = "Agua Instantanea (1)" },
+    { key = "ElecShut",   expected = 1, label = "Eletric. Instantanea (1)" },
     { key = "AlarmDecay", expected = 6, label = "Bateria Alarme (0-5 Anos=6)" },
     { key = "Alarm",      expected = 6, label = "Alarmes Casas (Muito Freq.=6)" },
 
     -- [ NATUREZA ]
-    { key = "NightDarkness",  expected = 2, label = "Escuridão Noite (Escuro=2)" },
+    { key = "NightDarkness",  expected = 2, label = "Escuridao Noite (Escuro=2)" },
     { key = "Temperature",    expected = 2, label = "Temperatura (Frio=2)" },
     { key = "Rain",           expected = 2, label = "Chuva (Seco=2)" },
     { key = "FishAbundance",  expected = 1, label = "Pesca (Muito Ruim=1)" },
     { key = "NatureAbundance",expected = 1, label = "Natureza (Muito Ruim=1)" },
 
     -- [ AMBIENTE ]
-    { key = "MetaEvent", expected = 3, label = "Eventos Aleatórios (Freq.=3)" },
+    { key = "MetaEvent", expected = 3, label = "Eventos Aleatorios (Freq.=3)" },
 
     -- [ PERSONAGEM ]
     { key = "MultiplierConfig.Global", expected = 0.8, label = "Mult. XP Global (0.8)", tol = 0.05 },
 
-    -- [ VEÍCULOS ]
+    -- [ VEICULOS ]
     { key = "ChanceHasGas",        expected = 1, label = "Gasolina (Baixo=1)" },
     { key = "InitialGas",          expected = 1, label = "Gasolina Inicial (M.Baixo=1)" },
-    { key = "LockedCar",           expected = 6, label = "Veículos Trancados (M.Freq.=6)" },
-    { key = "CarGeneralCondition", expected = 1, label = "Cond. Veículos (M.Baixo=1)" },
+    { key = "LockedCar",           expected = 6, label = "Veiculos Trancados (M.Freq.=6)" },
+    { key = "CarGeneralCondition", expected = 1, label = "Cond. Veiculos (M.Baixo=1)" },
 
     -- [ ANIMAIS ]
     { key = "AnimalRanchChance", expected = 2, label = "Animais (Ext.Raro=2)" },
 }
 
--- ── Leitura de sub-tabelas via path com pontos ─────────────────────────────
---  "ZombieLore.Speed"  →  SandboxVars.ZombieLore.Speed
---  "Map.AllowMiniMap"  →  SandboxVars.Map.AllowMiniMap
---  "Temperature"       →  SandboxVars.Temperature
+-- -- Leitura de sub-tabelas via path com pontos -----------------------------
+--  "ZombieLore.Speed"  ->  SandboxVars.ZombieLore.Speed
+--  "Map.AllowMiniMap"  ->  SandboxVars.Map.AllowMiniMap
+--  "Temperature"       ->  SandboxVars.Temperature
 
 local function readVar(key)
     local ok, val = pcall(function()
@@ -145,7 +145,7 @@ local function valuesMatch(actual, expected, tol)
     return actual == expected
 end
 
--- ── Validação principal ────────────────────────────────────────────────────
+-- -- Validacao principal ----------------------------------------------------
 
 function RankSandbox.validate()
     local violations = {}
@@ -164,18 +164,18 @@ function RankSandbox.validate()
                 got      = actual,
             })
             RankLog.warn(string.format(
-                "SANDBOX INVALIDO — %s: esperado=%s atual=%s",
+                "SANDBOX INVALIDO - %s: esperado=%s atual=%s",
                 rule.label, tostring(rule.expected), tostring(actual)
             ))
         else
-            RankLog.info("OK — " .. rule.label .. " = " .. tostring(actual))
+            RankLog.info("OK - " .. rule.label .. " = " .. tostring(actual))
         end
     end
 
     return violations, missing
 end
 
--- ── Escrita de sub-tabelas via path com pontos ─────────────────────────────
+-- -- Escrita de sub-tabelas via path com pontos -----------------------------
 --  Espelho de readVar, mas atribuindo em vez de lendo.
 
 local function writeVar(key, value)
@@ -228,11 +228,11 @@ function RankSandbox.verifyAndCorrect()
     local v1, _ = RankSandbox.validate()
 
     if #v1 == 0 then
-        RankLog.info("verifyAndCorrect: sandbox OK — nenhuma correcao necessaria.")
+        RankLog.info("verifyAndCorrect: sandbox OK - nenhuma correcao necessaria.")
         return true
     end
 
-    RankLog.warn(string.format("verifyAndCorrect: %d divergencia(s) detectada(s) — corrigindo.", #v1))
+    RankLog.warn(string.format("verifyAndCorrect: %d divergencia(s) detectada(s) - corrigindo.", #v1))
     for _, v in ipairs(v1) do
         RankLog.warn(string.format("  X  %s: esperado=%s atual=%s",
             v.label, tostring(v.expected), tostring(v.got)))
@@ -255,7 +255,7 @@ function RankSandbox.verifyAndCorrect()
     return false
 end
 
--- ── API publica ─────────────────────────────────────────────────────────────
+-- -- API publica -------------------------------------------------------------
 
 function RankSandbox.check(showMissing)
     local violations, missing = RankSandbox.validate()
@@ -263,7 +263,7 @@ function RankSandbox.check(showMissing)
     local hasMissing    = #missing > 0
 
     if not hasViolations and not (showMissing and hasMissing) then
-        RankLog.info("Sandbox OK — todas as configuracoes conferem.")
+        RankLog.info("Sandbox OK - todas as configuracoes conferem.")
         return true
     end
 

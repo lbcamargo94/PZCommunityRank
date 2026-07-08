@@ -1,23 +1,23 @@
 -- ============================================================
---  RankCode.lua — Gerador do código de submissão
+--  RankCode.lua - Gerador do codigo de submissao
 --
---  Formato atual (antes da ofuscação) — 9 campos:
---  PZR|<nome>|<profissão>|<kills>|<minutos>|<skills>|<status>|<sandbox>|<traits>
+--  Formato atual (antes da ofuscacao) - 9 campos:
+--  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|<traits>
 --
 --  <status>:  "morto" ou "vivo"
 --  <sandbox>: "ok" ou "invalido"
---  <traits>:  IDs separados por vírgula (ex: "Athletic,Lucky,Smoker"); pode ser vazio
+--  <traits>:  IDs separados por virgula (ex: "Athletic,Lucky,Smoker"); pode ser vazio
 --
 --  Prefixo "PZRX2:" (v1.4+, 9 campos). Prefixo "PZRX1:" era o
 --  formato legado com 6 campos (sem status, sandbox ou traits).
 --  O site (src/app.ts) deve checar o prefixo para saber o formato.
 --
---  IMPORTANTE: isto é OFUSCAÇÃO, não criptografia forte — o mod é
---  Lua aberto (Workshop) e o site é JS aberto no navegador, então
---  a chave abaixo não é secreta de verdade. Serve só para impedir
---  edição casual do arquivo num editor de texto.
+--  IMPORTANTE: isto e OFUSCACAO, nao criptografia forte - o mod e
+--  Lua aberto (Workshop) e o site e JS aberto no navegador, entao
+--  a chave abaixo nao e secreta de verdade. Serve so para impedir
+--  edicao casual do arquivo num editor de texto.
 --
---  A XOR_KEY abaixo precisa ser IDÊNTICA à constante XOR_KEY em
+--  A XOR_KEY abaixo precisa ser IDENTICA a constante XOR_KEY em
 --  src/app.ts no site, byte a byte.
 -- ============================================================
 
@@ -28,7 +28,7 @@ RankCode = {}
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
--- XOR de um byte sem operadores de bit (compatível com Kahlua/Lua 5.1)
+-- XOR de um byte sem operadores de bit (compativel com Kahlua/Lua 5.1)
 local function byteXor(a, b)
     local result = 0
     local bitval = 1
@@ -125,10 +125,10 @@ local function deobfuscate(encoded)
     return xorBytes(base64Decode(encoded), XOR_KEY)
 end
 
--- Gera o código (com prefixo de formato) a partir dos dados coletados
--- PZRX2: 9 campos — nome|profissão|kills|tempo|skills|status|sandbox|traits
--- Campo sandbox: "ok" = configurações válidas; "invalido" = sandbox diverge do desafio
--- Campo traits: IDs separados por vírgula (ex: "Athletic,Lucky,Smoker")
+-- Gera o codigo (com prefixo de formato) a partir dos dados coletados
+-- PZRX2: 9 campos - nome|profissao|kills|tempo|skills|status|sandbox|traits
+-- Campo sandbox: "ok" = configuracoes validas; "invalido" = sandbox diverge do desafio
+-- Campo traits: IDs separados por virgula (ex: "Athletic,Lucky,Smoker")
 function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local traitsStr  = table.concat(entry.traits or {}, ",")
@@ -151,7 +151,7 @@ function RankCode.generate(entry)
     return "PZRX2:" .. obfuscate(plain)
 end
 
--- Valida se uma string é um código PZRX1 (v1.3, 6 campos) ou PZRX2 (v1.4+, 7 campos).
+-- Valida se uma string e um codigo PZRX1 (v1.3, 6 campos) ou PZRX2 (v1.4+, 7 campos).
 function RankCode.isValid(code)
     if not code or type(code) ~= "string" then return false end
     local prefix, encoded = code:match("^(PZRX[12]:)(.+)$")

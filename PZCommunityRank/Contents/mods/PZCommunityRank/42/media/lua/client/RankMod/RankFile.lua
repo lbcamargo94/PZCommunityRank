@@ -1,24 +1,24 @@
 -- ============================================================
---  RankFile.lua — Exporta o código de rank para arquivo .txt
+--  RankFile.lua - Exporta o codigo de rank para arquivo .txt
 --
 --  Salva em <pasta Zomboid>/Lua/pz_rank/pz_rank_<personagem>.txt
---  Um arquivo por personagem; cada geração é ADICIONADA ao final.
---  O histórico completo fica registrado no mesmo arquivo.
---  O Companion sempre lê o último código (entrada mais recente).
+--  Um arquivo por personagem; cada geracao e ADICIONADA ao final.
+--  O historico completo fica registrado no mesmo arquivo.
+--  O Companion sempre le o ultimo codigo (entrada mais recente).
 -- ============================================================
 
 require "RankMod/RankLog"
 
 RankFile = {}
 
--- Remove caracteres inválidos em nomes de arquivo; espaços → _
+-- Remove caracteres invalidos em nomes de arquivo; espacos -> _
 local function sanitizeName(name)
     local s = (name or "Sobrevivente"):gsub('[<>:"/\\|?*]', ""):gsub("%s+", "_")
     return (s ~= "" and s) or "Sobrevivente"
 end
 
 -- Retorna data/hora real do computador como string "YYYY-MM-DD HH:MM:SS".
--- Tentativa 1: os.date (disponível no LuaJ do PZ B42, hora do sistema).
+-- Tentativa 1: os.date (disponivel no LuaJ do PZ B42, hora do sistema).
 -- Tentativa 2: Java System.currentTimeMillis via luajava (fallback robusto).
 local function systemTime()
     local ok, s = pcall(function() return os.date("%Y-%m-%d %H:%M:%S") end)
@@ -36,9 +36,9 @@ local function systemTime()
     return "?"
 end
 
--- Adiciona entry + code ao arquivo do personagem (cria se não existir).
--- Cada chamada ACUMULA no mesmo arquivo — histórico completo por personagem.
--- Retorna true em sucesso; nunca lança exceção (erros vão para o log).
+-- Adiciona entry + code ao arquivo do personagem (cria se nao existir).
+-- Cada chamada ACUMULA no mesmo arquivo - historico completo por personagem.
+-- Retorna true em sucesso; nunca lanca excecao (erros vao para o log).
 function RankFile.save(entry, code)
     local charName = sanitizeName(entry.character_name)
     local filename = "pz_rank_" .. charName .. ".txt"
@@ -64,7 +64,7 @@ function RankFile.save(entry, code)
 
     local ok, err = pcall(function()
         -- create_dirs=true: cria pz_rank/ se ausente
-        -- append=true: acumula histórico no mesmo arquivo
+        -- append=true: acumula historico no mesmo arquivo
         local w = getFileWriter(filePath, true, true)
         if not w then error("getFileWriter retornou nil") end
         w:write(content)

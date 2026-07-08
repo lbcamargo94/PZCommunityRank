@@ -1,27 +1,27 @@
 -- ============================================================
---  RankSandboxExport.lua — Exporta configurações completas do Sandbox
+--  RankSandboxExport.lua - Exporta configuracoes completas do Sandbox
 --
---  Gera um arquivo JSON com TODAS as opções do SandboxVars ativo,
+--  Gera um arquivo JSON com TODAS as opcoes do SandboxVars ativo,
 --  sem filtros, para auditoria pelos moderadores no painel web.
 --
 --  Arquivo gerado: <Zomboid>/Lua/pz_rank/pz_rank_sandbox_<Personagem>.json
---  Formato separado do PZRX2 — não interfere no fluxo de ranking.
+--  Formato separado do PZRX2 - nao interfere no fluxo de ranking.
 -- ============================================================
 
 require "RankMod/RankLog"
 
 RankSandboxExport = {}
 
--- ── Serializador JSON seguro para Lua 5.1 / Kahlua ───────────────────────────
+-- -- Serializador JSON seguro para Lua 5.1 / Kahlua ---------------------------
 -- Suporta: nil, boolean, number, string, table (aninhada)
--- Userdata / functions → "null" ou representação de string.
+-- Userdata / functions -> "null" ou representacao de string.
 
 local MAX_DEPTH = 10
 
 local function escapeStr(s)
     s = tostring(s)
     -- Kahlua nao suporta classes de caracteres com bytes nulos em gsub
-    -- (ex: '[\000-\031]' lanca "malformed pattern") — usa loop char-a-char
+    -- (ex: '[\000-\031]' lanca "malformed pattern") - usa loop char-a-char
     local out = {}
     for i = 1, #s do
         local c = s:sub(i, i)
@@ -52,7 +52,7 @@ local function encodeVal(val, depth)
         if val ~= val        then return '"NaN"' end     -- NaN
         if val ==  math.huge then return '"Infinity"' end
         if val == -math.huge then return '"-Infinity"' end
-        -- Inteiro → sem casas decimais
+        -- Inteiro -> sem casas decimais
         if val == math.floor(val) and math.abs(val) < 1e15 then
             return string.format('%d', val)
         end
@@ -60,7 +60,7 @@ local function encodeVal(val, depth)
     end
 
     if t == 'table' then
-        -- Detecta se é array puro (chaves 1..n sem buracos)
+        -- Detecta se e array puro (chaves 1..n sem buracos)
         local count = 0
         for _ in pairs(val) do count = count + 1 end
 
@@ -76,7 +76,7 @@ local function encodeVal(val, depth)
             return '[' .. table.concat(parts, ',') .. ']'
         end
 
-        -- Objeto — ordena chaves para saída estável
+        -- Objeto - ordena chaves para saida estavel
         local parts = {}
         local keys  = {}
         for k in pairs(val) do
@@ -93,7 +93,7 @@ local function encodeVal(val, depth)
         return '{' .. table.concat(parts, ',') .. '}'
     end
 
-    -- userdata, function, thread → tenta tostring, senão null
+    -- userdata, function, thread -> tenta tostring, senao null
     if t == 'userdata' or t == 'function' then
         local ok2, s = pcall(tostring, val)
         if ok2 and type(s) == 'string' then return escapeStr('[' .. t .. ':' .. s .. ']') end
@@ -102,15 +102,15 @@ local function encodeVal(val, depth)
     return 'null'
 end
 
--- Kahlua não implementa next() — usa pairs() para verificar tabela não-vazia
+-- Kahlua nao implementa next() - usa pairs() para verificar tabela nao-vazia
 local function tableHasItems(t)
     for _ in pairs(t) do return true end
     return false
 end
 
--- ── Captura segura de SandboxVars ────────────────────────────────────────────
--- Percorre dinamicamente todas as categorias disponíveis.
--- Categorias que falharem ao iterar são ignoradas (pcall em cada).
+-- -- Captura segura de SandboxVars --------------------------------------------
+-- Percorre dinamicamente todas as categorias disponiveis.
+-- Categorias que falharem ao iterar sao ignoradas (pcall em cada).
 
 local function captureSandbox()
     local result = {}
@@ -132,7 +132,7 @@ local function captureSandbox()
                             if vt == 'number' or vt == 'boolean' or vt == 'string' then
                                 sub[k] = v
                             elseif vt == 'table' then
-                                -- Um nível extra (ex: ZombieConfig.SubTable)
+                                -- Um nivel extra (ex: ZombieConfig.SubTable)
                                 local sub2 = {}
                                 for k2, v2 in pairs(v) do
                                     local vt2 = type(v2)
@@ -151,7 +151,7 @@ local function captureSandbox()
                 if tableHasItems(sub) then result[catKey] = sub end
 
             elseif t == 'number' or t == 'boolean' or t == 'string' then
-                -- Valor primitivo no nível raiz
+                -- Valor primitivo no nivel raiz
                 result[catKey] = catVal
             end
         end
@@ -160,7 +160,7 @@ local function captureSandbox()
     return result
 end
 
--- ── Timestamp real ─────────────────────────────────────────────────────────
+-- -- Timestamp real ---------------------------------------------------------
 local function systemTime()
     local ok, s = pcall(function() return os.date("%Y-%m-%dT%H:%M:%S") end)
     if ok and type(s) == 'string' and #s > 10 then return s end
@@ -177,14 +177,14 @@ local function systemTime()
     return '?'
 end
 
--- ── Sanitiza nome de personagem para nome de arquivo ──────────────────────
+-- -- Sanitiza nome de personagem para nome de arquivo ----------------------
 local function sanitizeName(name)
     local s = (name or 'Sobrevivente'):gsub('[<>:"/\\|?*]', ''):gsub('%s+', '_')
     return (s ~= '' and s) or 'Sobrevivente'
 end
 
--- ── Exportação principal ───────────────────────────────────────────────────
--- Chame com o nome do personagem (já sanitizado ou não).
+-- -- Exportacao principal ---------------------------------------------------
+-- Chame com o nome do personagem (ja sanitizado ou nao).
 -- Retorna true em sucesso, false em falha.
 
 function RankSandboxExport.export(charName)
@@ -203,7 +203,7 @@ function RankSandboxExport.export(charName)
 
         local json = encodeVal(payload)
 
-        local w = getFileWriter(filePath, true, false)  -- overwrite (não acumular)
+        local w = getFileWriter(filePath, true, false)  -- overwrite (nao acumular)
         if not w then error('getFileWriter retornou nil') end
         w:write(json)
         w:close()

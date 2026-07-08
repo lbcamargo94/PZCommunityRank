@@ -1,9 +1,9 @@
 -- ============================================================
---  RankLog.lua — Log próprio do mod (facilita diagnóstico)
+--  RankLog.lua - Log proprio do mod (facilita diagnostico)
 --
---  Grava em <pasta do Zomboid>/Lua/PZRank_log.txt, além do
---  console padrão (prefixo [PZRank]). Não trava o mod se a
---  escrita em arquivo falhar — vira só um print no console.
+--  Grava em <pasta do Zomboid>/Lua/PZRank_log.txt, alem do
+--  console padrao (prefixo [PZRank]). Nao trava o mod se a
+--  escrita em arquivo falhar - vira so um print no console.
 -- ============================================================
 
 RankLog = {}

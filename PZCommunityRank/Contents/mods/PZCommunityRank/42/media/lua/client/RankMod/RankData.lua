@@ -1,15 +1,15 @@
 -- ============================================================
---  RankData.lua — Coleta de dados do personagem (B42.19+)
+--  RankData.lua - Coleta de dados do personagem (B42.19+)
 -- ============================================================
 
 require "RankMod/RankLog"
 
 RankData = {}
 
--- Coleta todas as habilidades dinamicamente via Perks.fromIndex (padrão do jogo, vide ISPerkLog.lua).
--- perk:getType() devolve o ID inglês (ex: "Blunt", "Woodwork") — o backend traduz para PT-BR.
--- perk:getParent() ~= Perks.None filtra as categorias-raiz (Física, Combate…) que não têm nível.
--- Abordagem dinâmica: novos perks adicionados no B42 são coletados automaticamente.
+-- Coleta todas as habilidades dinamicamente via Perks.fromIndex (padrao do jogo, vide ISPerkLog.lua).
+-- perk:getType() devolve o ID ingles (ex: "Blunt", "Woodwork") - o backend traduz para PT-BR.
+-- perk:getParent() ~= Perks.None filtra as categorias-raiz (Fisica, Combate?) que nao tem nivel.
+-- Abordagem dinamica: novos perks adicionados no B42 sao coletados automaticamente.
 function RankData.getSkills(player)
     local rawTable = {}
     local strs     = {}
@@ -73,13 +73,13 @@ local function getCharacterName(player)
     return "Sobrevivente"
 end
 
--- Tentativa de obter a profissão via métodos do descriptor.
--- REGRA: NUNCA chamar um método sem verificar existência antes.
--- Em B42.19 o bridge Kahlua NÃO registra todos os métodos Java:
---   • getProfession()  → lança RuntimeException (tipo não mapeado)
---   • getOccupation()  → nil no bridge → "Tried to call nil" (também logado pelo PZ)
--- Ambos os erros são logados pelo PZ mesmo quando capturados por pcall.
--- A verificação type(desc.X) == "function" garante que só chamamos o que existe.
+-- Tentativa de obter a profissao via metodos do descriptor.
+-- REGRA: NUNCA chamar um metodo sem verificar existencia antes.
+-- Em B42.19 o bridge Kahlua NAO registra todos os metodos Java:
+--   ? getProfession()  -> lanca RuntimeException (tipo nao mapeado)
+--   ? getOccupation()  -> nil no bridge -> "Tried to call nil" (tambem logado pelo PZ)
+-- Ambos os erros sao logados pelo PZ mesmo quando capturados por pcall.
+-- A verificacao type(desc.X) == "function" garante que so chamamos o que existe.
 local function getProfessionName(player)
     if not player then
         return "Desconhecida"
@@ -120,10 +120,10 @@ local function getProfessionName(player)
     return tostring(profession)
 end
 
--- Coleta os traços (traits) via API oficial do B42 (ISPlayerStatsUI.lua, SpawnItems.lua):
---   player:getCharacterTraits():getKnownTraits()          → lista de traits ativas
---   CharacterTraitDefinition.getCharacterTraitDefinition(obj):getType() → ID inglês
--- Os IDs são exportados em inglês (ex: "Athletic", "Smoker") para tradução no site.
+-- Coleta os tracos (traits) via API oficial do B42 (ISPlayerStatsUI.lua, SpawnItems.lua):
+--   player:getCharacterTraits():getKnownTraits()          -> lista de traits ativas
+--   CharacterTraitDefinition.getCharacterTraitDefinition(obj):getType() -> ID ingles
+-- Os IDs sao exportados em ingles (ex: "Athletic", "Smoker") para traducao no site.
 local function collectTraits(player)
     local result = {}
 
@@ -157,7 +157,7 @@ local function collectTraits(player)
     return result
 end
 
--- Detecta se o jogador está morto quando isDead não é passado explicitamente.
+-- Detecta se o jogador esta morto quando isDead nao e passado explicitamente.
 local function resolveIsDead(player, isDead)
     if isDead ~= nil then return isDead end
     local ok, dead = pcall(function() return player:isDead() end)

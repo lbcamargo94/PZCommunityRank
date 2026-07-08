@@ -1,5 +1,5 @@
 -- ============================================================
---  RankMain.lua — Ponto de entrada (B42.19+)
+--  RankMain.lua - Ponto de entrada (B42.19+)
 -- ============================================================
 
 require "RankMod/RankLog"
@@ -14,23 +14,23 @@ require "RankMod/RankSandboxExport"
 RankMain = {}
 RankMain.submitted = {}
 
--- True durante os primeiros ~120 ticks após OnGameStart para ignorar
--- OnPlayerDeath disparado ao carregar um save com personagem já morto.
+-- True durante os primeiros ~120 ticks apos OnGameStart para ignorar
+-- OnPlayerDeath disparado ao carregar um save com personagem ja morto.
 local _isStartingUp = false
 
--- Último código gerado pelo silentUpdate — evita salvar arquivos sem mudança de estado.
+-- Ultimo codigo gerado pelo silentUpdate - evita salvar arquivos sem mudanca de estado.
 local _lastSilentCode = nil
 
--- Contador para disparo periódico (~5 min a 60fps).
+-- Contador para disparo periodico (~5 min a 60fps).
 local _periodicTick  = 0
 local PERIODIC_TICKS = 18000
 
--- Contador de kills desde o último silentUpdate por kills.
+-- Contador de kills desde o ultimo silentUpdate por kills.
 local _killsSinceSync = 0
 local KILLS_PER_SYNC  = 5    -- dispara sync a cada 5 kills
 
--- Coleta dados, gera código, salva arquivo e abre a UI de resultado.
--- O Companion (app externo) faz o sync via arquivo — nenhuma rede aqui.
+-- Coleta dados, gera codigo, salva arquivo e abre a UI de resultado.
+-- O Companion (app externo) faz o sync via arquivo - nenhuma rede aqui.
 local function triggerRank(player, playerIndex, isDead)
     playerIndex = playerIndex or 0
 
@@ -47,12 +47,12 @@ local function triggerRank(player, playerIndex, isDead)
         return
     end
 
-    -- Valida sandbox e embute o resultado no entry para inclusão no código.
+    -- Valida sandbox e embute o resultado no entry para inclusao no codigo.
     local sandboxOk = true
     pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
     entry.sandbox_ok = sandboxOk
     if not sandboxOk then
-        RankLog.warn("triggerRank: sandbox invalido — codigo sera marcado como 'invalido'.")
+        RankLog.warn("triggerRank: sandbox invalido - codigo sera marcado como 'invalido'.")
     end
 
     local code = RankCode.generate(entry)
@@ -63,19 +63,19 @@ local function triggerRank(player, playerIndex, isDead)
     end
 
     RankFile.save(entry, code)
-    -- Exporta sandbox em arquivo separado — independente do PZRX2
+    -- Exporta sandbox em arquivo separado - independente do PZRX2
     pcall(function() RankSandboxExport.export(entry.character_name) end)
     RankSubmitUI.open(entry, code, playerIndex)
 end
 
 RankMain.triggerRank = triggerRank
 
--- Salva arquivo sem abrir UI — usada em saves periódicos e ao sair do mundo.
--- Deduplicação via código: se o estado não mudou, não gera novo arquivo.
--- IMPORTANTE: chamada sempre dentro de pcall para não desregistrar handlers de evento.
+-- Salva arquivo sem abrir UI - usada em saves periodicos e ao sair do mundo.
+-- Deduplicacao via codigo: se o estado nao mudou, nao gera novo arquivo.
+-- IMPORTANTE: chamada sempre dentro de pcall para nao desregistrar handlers de evento.
 local function silentUpdate(player, playerIndex)
     playerIndex = playerIndex or 0
-    if RankMain.submitted[playerIndex] then return end  -- jogador já morreu neste run
+    if RankMain.submitted[playerIndex] then return end  -- jogador ja morreu neste run
 
     local entry = RankData.collect(player, false)
     if not entry then return end
@@ -95,7 +95,7 @@ local function silentUpdate(player, playerIndex)
 
     RankFile.save(entry, code)
     pcall(function() RankSandboxExport.export(entry.character_name) end)
-    RankLog.info("silentUpdate: arquivo sincronizado — " .. (entry.character_name or "?"))
+    RankLog.info("silentUpdate: arquivo sincronizado - " .. (entry.character_name or "?"))
 end
 
 -- Wrapper seguro: garante que silentUpdate nao pode crashar o handler do evento.
@@ -113,7 +113,7 @@ local function isLocalPlayer(player)
     return not (isClient and isClient())
 end
 
--- ── Evento: morte do jogador ────────────────────────────────
+-- -- Evento: morte do jogador --------------------------------
 local function onPlayerDeath(player, playerIndex)
     if not player then return end
     playerIndex = playerIndex or 0
@@ -150,7 +150,7 @@ local function onPlayerDeath(player, playerIndex)
     end
 end
 
--- ── Evento: início de partida ───────────────────────────────
+-- -- Evento: inicio de partida -------------------------------
 local function onGameStart()
     RankMain.submitted = {}
     _killsSinceSync    = 0
@@ -168,8 +168,8 @@ local function onGameStart()
         if graceTicks >= 120 then
             _isStartingUp = false
             pcall(function() Events.OnTick.Remove(clearStartup) end)
-            -- Sync inicial + validação de sandbox após carregamento estável.
-            RankLog.info("OnGameStart: grace period concluido — sync inicial")
+            -- Sync inicial + validacao de sandbox apos carregamento estavel.
+            RankLog.info("OnGameStart: grace period concluido - sync inicial")
             local ok, player = pcall(getPlayer)
             if ok and player and isLocalPlayer(player) then
                 safeSilentUpdate(player, 0)
@@ -193,7 +193,7 @@ local function onGameStart()
                         p2:getModData()["PZCommunityRank_IsChallenge"] = true
                     end
                 end)
-                RankLog.info("OnGameStart: novo jogo BRASILEIRAO — marcado como desafio.")
+                RankLog.info("OnGameStart: novo jogo BRASILEIRAO - marcado como desafio.")
             else
                 pcall(function()
                     local p2 = getPlayer()
@@ -212,7 +212,7 @@ local function onGameStart()
     pcall(function() Events.OnTick.Add(clearStartup) end)
 end
 
--- ── Comando /rank no chat ───────────────────────────────────
+-- -- Comando /rank no chat -----------------------------------
 local function onChatCommand(text)
     if text ~= "/rank" then return end
     local player = getPlayer()
@@ -226,7 +226,7 @@ local function onChatCommand(text)
     return true
 end
 
--- ── Menu de contexto ────────────────────────────────────────
+-- -- Menu de contexto ----------------------------------------
 local function onGenerateRank(worldObjects, playerIndex)
     local player = getSpecificPlayer(playerIndex)
     if not player then return end
@@ -234,8 +234,8 @@ local function onGenerateRank(worldObjects, playerIndex)
     triggerRank(player, playerIndex, false)
 end
 
--- OnFillWorldObjectContextMenu: primeiro arg é o índice do jogador (número inteiro),
--- não o objeto player — o nome 'player' nas funções do jogo é enganoso.
+-- OnFillWorldObjectContextMenu: primeiro arg e o indice do jogador (numero inteiro),
+-- nao o objeto player - o nome 'player' nas funcoes do jogo e enganoso.
 local function onFillWorldContextMenu(playerIndex, context, worldObjects, test)
     if test then return end
     local player = getSpecificPlayer(playerIndex)
@@ -253,8 +253,8 @@ else
     RankLog.warn("OnTryTalkInChat indisponivel no B42. Comando /rank desabilitado.")
 end
 
--- ── Atualização + validação ao salvar / sair do mundo ─────
--- B42: OnSave foi substituido por OnPostSave (dispara após o save, inclusive ao sair para o menu).
+-- -- Atualizacao + validacao ao salvar / sair do mundo -----
+-- B42: OnSave foi substituido por OnPostSave (dispara apos o save, inclusive ao sair para o menu).
 pcall(function()
     Events.OnPostSave.Add(function()
         if _isStartingUp then return end
@@ -267,8 +267,8 @@ pcall(function()
     end)
 end)
 
--- ── Atualização ao subir de nível em qualquer skill ────────
--- A assinatura do evento varia entre versões do PZ; capturamos o player direto.
+-- -- Atualizacao ao subir de nivel em qualquer skill --------
+-- A assinatura do evento varia entre versoes do PZ; capturamos o player direto.
 pcall(function()
     Events.LevelPerk.Add(function(...)
         if _isStartingUp then return end
@@ -280,14 +280,14 @@ pcall(function()
     end)
 end)
 
--- ── Atualização ao matar um zumbi (debounce: 1 sync a cada 5 kills) ──
+-- -- Atualizacao ao matar um zumbi (debounce: 1 sync a cada 5 kills) --
 pcall(function()
     Events.OnZombieDead.Add(function(zombie)
         if _isStartingUp then return end
         _killsSinceSync = _killsSinceSync + 1
         if _killsSinceSync < KILLS_PER_SYNC then return end
         _killsSinceSync = 0
-        RankLog.info("OnZombieDead: " .. KILLS_PER_SYNC .. " kills — disparando sync")
+        RankLog.info("OnZombieDead: " .. KILLS_PER_SYNC .. " kills - disparando sync")
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
@@ -295,11 +295,11 @@ pcall(function()
     end)
 end)
 
--- ── Atualização a cada novo dia no jogo ────────────────────
+-- -- Atualizacao a cada novo dia no jogo --------------------
 pcall(function()
     Events.EveryDays.Add(function()
         if _isStartingUp then return end
-        RankLog.info("EveryDays: novo dia — disparando sync")
+        RankLog.info("EveryDays: novo dia - disparando sync")
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
@@ -307,18 +307,18 @@ pcall(function()
     end)
 end)
 
--- ── Atualização periódica a cada ~5 min ────────────────────
+-- -- Atualizacao periodica a cada ~5 min --------------------
 Events.OnTick.Add(function()
     _periodicTick = _periodicTick + 1
     if _periodicTick < PERIODIC_TICKS then return end
     _periodicTick = 0
 
     if _isStartingUp then return end
-    RankLog.info("Periodic: ~5 min — disparando sync")
+    RankLog.info("Periodic: ~5 min - disparando sync")
     local ok, player = pcall(getPlayer)
     if not ok or not player then return end
     if not isLocalPlayer(player) then return end
     safeSilentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado — B42.19+ | v2.2.2")
+RankLog.info("Mod carregado - B42.19+ | v2.2.3")

@@ -1,5 +1,5 @@
 -- ============================================================
---  RankUI.lua — Janela de resultado (B42.19+)
+--  RankUI.lua - Janela de resultado (B42.19+)
 -- ============================================================
 
 require "ISUI/ISPanel"
@@ -16,7 +16,7 @@ local iW  = W - PAD * 2
 local COL2 = PAD + 150
 
 -- Layout vertical
--- Seção de progresso: cabeçalho + 4 linhas (tempo, kills, profissão, status)
+-- Secao de progresso: cabecalho + 4 linhas (tempo, kills, profissao, status)
 local BTN_W     = 140
 local ROW_H     = 26
 local PROG_SEC  = { y = ROW_H + 20, h = 100 }  -- y=46, h=100 (4 linhas)
@@ -40,7 +40,7 @@ function RankSubmitUI:new(entry, code, playerIndex)
 
     -- getPlayerScreenWidth/Height retornam 0 para o slot de jogador morto no B42.19,
     -- posicionando o painel em coordenadas negativas (fora da tela).
-    -- getCore():getScreenWidth/Height() sempre retorna as dimensões reais da janela.
+    -- getCore():getScreenWidth/Height() sempre retorna as dimensoes reais da janela.
     local screenW = getCore():getScreenWidth()
     local screenH = getCore():getScreenHeight()
 
@@ -59,25 +59,25 @@ end
 function RankSubmitUI:initialise()
     ISPanel.initialise(self)
 
-    -- ── Linha: campo do código + botão selecionar ─────────────
+    -- -- Linha: campo do codigo + botao selecionar -------------
     local boxW = iW - BTN_W - 6
     self.codeBox = ISTextEntryBox:new(self.code or "", PAD, PAD, boxW, ROW_H, self, nil)
     self.codeBox:initialise(); self:addChild(self.codeBox)
 
     self.btnSelect = ISButton:new(PAD + boxW + 6, PAD, BTN_W, ROW_H,
-        "selecionar código", self, RankSubmitUI.onSelectCode)
+        "selecionar codigo", self, RankSubmitUI.onSelectCode)
     self.btnSelect:initialise(); self:addChild(self.btnSelect)
 
-    -- ── Seção: Progresso ──────────────────────────────────────
+    -- -- Secao: Progresso --------------------------------------
     local py = PROG_SEC.y
     local statusLabel = self.entry.is_dead and "Morto" or "Vivo"
     addSectionHeader(self, PAD + 4, py + 4,  "Progresso:")
-    addRow(self, PAD + 4, py + 22, "Sobrevivência:",          self.entry.time_str or "?")
+    addRow(self, PAD + 4, py + 22, "Sobrevivencia:",          self.entry.time_str or "?")
     addRow(self, PAD + 4, py + 40, "Zumbis mortos:",          tostring(self.entry.kills or 0))
-    addRow(self, PAD + 4, py + 58, "Profissão:",              self.entry.profession or "Desconhecida")
+    addRow(self, PAD + 4, py + 58, "Profissao:",              self.entry.profession or "Desconhecida")
     addRow(self, PAD + 4, py + 76, "Status:",                 statusLabel)
 
-    -- ── Botão fechar ──────────────────────────────────────────
+    -- -- Botao fechar ------------------------------------------
     self.btnClose = ISButton:new(W / 2 - 75, SEP_Y + 10, 150, 30,
         "Fechar", self, RankSubmitUI.onClose)
     self.btnClose:initialise(); self:addChild(self.btnClose)
