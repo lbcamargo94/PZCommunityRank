@@ -8,6 +8,7 @@ require "RankMod/RankCode"
 require "RankMod/RankUI"
 require "RankMod/RankFile"
 require "RankMod/RankSandbox"
+require "RankMod/RankGameMode"
 require "RankMod/RankSandboxExport"
 
 RankMain = {}
