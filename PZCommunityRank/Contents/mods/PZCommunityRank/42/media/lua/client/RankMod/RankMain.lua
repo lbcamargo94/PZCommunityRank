@@ -219,16 +219,13 @@ local function onGameStart()
             pcall(function() Events.OnTick.Remove(clearStartup) end)
             RankLog.info("OnGameStart: grace period concluido.")
 
-            -- Detecta se este e um jogo do desafio BRASILEIRAO.
-            --
-            -- Novo jogo: _RankMod_PendingBrasileiraoSetup e verdadeiro (setado em RankGameMode
-            -- durante clickPlay). Marcamos o save via ModData e zeramos o flag.
-            --
-            -- Save carregado: verificamos o ModData gravado na sessao anterior.
+            -- Com o mod ativo, qualquer sessao e tratada como desafio.
+            -- _RankMod_PendingBrasileiraoSetup indica novo jogo via modo desafio:
+            -- nesse caso apenas marca o save no ModData e limpa o flag global.
+            _isChallengeGame = true
 
             if _RankMod_PendingBrasileiraoSetup then
                 _RankMod_PendingBrasileiraoSetup = nil
-                _isChallengeGame = true
                 pcall(function()
                     local p2 = getPlayer()
                     if p2 then
@@ -237,39 +234,27 @@ local function onGameStart()
                 end)
                 RankLog.info("OnGameStart: novo jogo BRASILEIRAO - marcado como desafio.")
             else
-                pcall(function()
-                    local p2 = getPlayer()
-                    if p2 and p2:getModData()["PZCommunityRank_IsChallenge"] then
-                        _isChallengeGame = true
-                        RankLog.info("OnGameStart: save do desafio BRASILEIRAO detectado.")
-                    end
-                end)
+                RankLog.info("OnGameStart: mod ativo - aplicando preset do desafio.")
             end
 
-            -- Para jogo de desafio: restaura desclassificacao previa (save carregado)
-            -- e reaaplica o preset completo para garantir que saves anteriores ao
-            -- v2.2.9 recebam todos os valores atualizados (nao apenas os 56 do RULES).
-            if _isChallengeGame then
-                pcall(function()
-                    local p2 = getPlayer()
-                    if p2 and p2:getModData()["PZCommunityRank_SandboxViolation"] then
-                        _sandboxViolationDetected = true
-                        RankLog.warn("OnGameStart: save com desclassificacao previa - sandbox_ok=false.")
-                    end
-                end)
-                RankLog.info("OnGameStart: reaplicando preset completo do desafio...")
-                pcall(function() RankSandbox.applyFullPreset() end)
-            end
+            -- Restaura desclassificacao gravada em sessao anterior.
+            pcall(function()
+                local p2 = getPlayer()
+                if p2 and p2:getModData()["PZCommunityRank_SandboxViolation"] then
+                    _sandboxViolationDetected = true
+                    RankLog.warn("OnGameStart: save com desclassificacao previa - sandbox_ok=false.")
+                end
+            end)
 
-            -- Sync inicial apos carregamento estavel (e apos correcao de sandbox).
+            -- Reaplica o preset completo (SandboxVars + Java SandboxOptions).
+            RankLog.info("OnGameStart: reaplicando preset completo do desafio...")
+            pcall(function() RankSandbox.applyFullPreset() end)
+
+            -- Sync inicial apos carregamento estavel e correcao de sandbox.
             RankLog.info("OnGameStart: sync inicial")
             local ok, player = pcall(getPlayer)
             if ok and player and isLocalPlayer(player) then
                 safeSilentUpdate(player, 0)
-            end
-
-            if not _isChallengeGame then
-                pcall(function() RankSandbox.check(false) end)
             end
         end
     end
@@ -411,4 +396,4 @@ Events.OnTick.Add(function()
     safeSilentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado - B42.19+ | v2.2.10")
+RankLog.info("Mod carregado - B42.19+ | v2.2.11")
