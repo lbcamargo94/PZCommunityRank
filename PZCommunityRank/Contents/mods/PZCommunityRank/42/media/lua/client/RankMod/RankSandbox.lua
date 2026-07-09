@@ -343,7 +343,8 @@ function RankSandbox.applyFullPreset()
     pcall(function() applyValues(preset, SandboxVars) end)
 
     -- Etapa 2: getSandboxOptions() (Java) - lido pela engine (IA, fisica, eventos).
-    -- Mesmo padrao de saveDesafioCfg(), mas na instancia ativa em vez de new().
+    -- Despachamos por opt:getType() igual ao ISServerSandboxOptionsUI.lua:726:
+    --   boolean/enum -> setValue   |   double/integer -> parse   |   string/text -> setValue
     local function syncToJava(tbl, prefix)
         if type(tbl) ~= "table" then return end
         for k, v in pairs(tbl) do
@@ -355,8 +356,11 @@ function RankSandbox.applyFullPreset()
                     pcall(function()
                         local opt = getSandboxOptions():getOptionByName(key)
                         if not opt then return end
+                        local optType = opt:getType()
                         if type(v) == "boolean" then
                             opt:setValue(v)
+                        elseif optType == "string" or optType == "text" then
+                            opt:setValue(tostring(v))
                         else
                             opt:parse(tostring(v))
                         end

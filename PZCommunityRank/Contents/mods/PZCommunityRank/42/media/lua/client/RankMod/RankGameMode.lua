@@ -66,8 +66,11 @@ local function saveDesafioCfg()
                         pcall(function()
                             local opt = opts:getOptionByName(key)
                             if not opt then return end
+                            local optType = opt:getType()
                             if type(v) == "boolean" then
                                 opt:setValue(v)
+                            elseif optType == "string" or optType == "text" then
+                                opt:setValue(tostring(v))
                             else
                                 opt:parse(tostring(v))
                             end
