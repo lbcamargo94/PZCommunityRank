@@ -18,6 +18,16 @@ RankMain.submitted = {}
 -- OnPlayerDeath disparado ao carregar um save com personagem ja morto.
 local _isStartingUp = false
 
+-- True quando a sessao atual e um jogo do desafio BRASILEIRAO.
+-- Persiste durante toda a sessao para que checks periodicos possam
+-- chamar verifyAndCorrect() em vez de apenas check().
+local _isChallengeGame = false
+
+-- True se foi detectada alteracao no preset completo durante o desafio.
+-- Uma vez ativado, permanece true pelo resto da sessao mesmo apos correcao.
+-- Persiste via ModData para saves carregados (PZCommunityRank_SandboxViolation).
+local _sandboxViolationDetected = false
+
 -- Ultimo codigo gerado pelo silentUpdate - evita salvar arquivos sem mudanca de estado.
 local _lastSilentCode = nil
 
@@ -28,6 +38,34 @@ local PERIODIC_TICKS = 18000
 -- Contador de kills desde o ultimo silentUpdate por kills.
 local _killsSinceSync = 0
 local KILLS_PER_SYNC  = 5    -- dispara sync a cada 5 kills
+
+-- Verifica todos os valores do preset completo. Se houver divergencias:
+--   1. Ativa _sandboxViolationDetected (permanente na sessao).
+--   2. Persiste PZCommunityRank_SandboxViolation no ModData do jogador.
+--   3. Chama verifyAndCorrect() para corrigir os valores (impede vantagem continua).
+-- Retorna true se o preset estava integro (sem violacoes detectadas).
+local function checkAndDisqualify(player)
+    local presetOk, violations = true, {}
+    pcall(function()
+        presetOk, violations = RankSandbox.verifyFullPreset()
+    end)
+
+    if not presetOk then
+        _sandboxViolationDetected = true
+        RankLog.warn(string.format(
+            "DESCLASSIFICADO: %d alteracao(es) no preset do desafio detectada(s).", #violations))
+        pcall(function()
+            if player then
+                player:getModData()["PZCommunityRank_SandboxViolation"] = true
+            end
+        end)
+    end
+
+    -- Corrige os valores independentemente da desclassificacao.
+    pcall(function() RankSandbox.verifyAndCorrect() end)
+
+    return presetOk
+end
 
 -- Coleta dados, gera codigo, salva arquivo e abre a UI de resultado.
 -- O Companion (app externo) faz o sync via arquivo - nenhuma rede aqui.
@@ -47,13 +85,18 @@ local function triggerRank(player, playerIndex, isDead)
         return
     end
 
-    -- Valida sandbox e embute o resultado no entry para inclusao no codigo.
+    -- Valida sandbox: desclassificacao por preset alterado tem prioridade sobre check pontual.
     local sandboxOk = true
-    pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
-    entry.sandbox_ok = sandboxOk
-    if not sandboxOk then
-        RankLog.warn("triggerRank: sandbox invalido - codigo sera marcado como 'invalido'.")
+    if _sandboxViolationDetected then
+        sandboxOk = false
+        RankLog.warn("triggerRank: desclassificado por alteracao no preset - codigo marcado invalido.")
+    else
+        pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
+        if not sandboxOk then
+            RankLog.warn("triggerRank: sandbox invalido - codigo sera marcado como 'invalido'.")
+        end
     end
+    entry.sandbox_ok = sandboxOk
 
     local code = RankCode.generate(entry)
     if not RankCode.isValid(code) then
@@ -81,7 +124,11 @@ local function silentUpdate(player, playerIndex)
     if not entry then return end
 
     local sandboxOk = true
-    pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
+    if _sandboxViolationDetected then
+        sandboxOk = false
+    else
+        pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
+    end
     entry.sandbox_ok = sandboxOk
 
     local code = RankCode.generate(entry)
@@ -153,9 +200,11 @@ end
 -- -- Evento: inicio de partida -------------------------------
 local function onGameStart()
     RankMain.submitted = {}
-    _killsSinceSync    = 0
-    _lastSilentCode    = nil
-    _periodicTick      = 0
+    _killsSinceSync           = 0
+    _lastSilentCode           = nil
+    _periodicTick             = 0
+    _isChallengeGame          = false
+    _sandboxViolationDetected = false
     RankLog.info("OnGameStart: submissoes resetadas.")
 
     -- Grace period: bloqueia OnPlayerDeath nos primeiros 120 ticks para evitar
@@ -168,25 +217,18 @@ local function onGameStart()
         if graceTicks >= 120 then
             _isStartingUp = false
             pcall(function() Events.OnTick.Remove(clearStartup) end)
-            -- Sync inicial + validacao de sandbox apos carregamento estavel.
-            RankLog.info("OnGameStart: grace period concluido - sync inicial")
-            local ok, player = pcall(getPlayer)
-            if ok and player and isLocalPlayer(player) then
-                safeSilentUpdate(player, 0)
-            end
-            pcall(function() RankSandbox.check(false) end)
+            RankLog.info("OnGameStart: grace period concluido.")
 
-            -- Detecta se este e um jogo do desafio BRASILEIRAO e verifica/corrige sandbox.
+            -- Detecta se este e um jogo do desafio BRASILEIRAO.
             --
             -- Novo jogo: _RankMod_PendingBrasileiraoSetup e verdadeiro (setado em RankGameMode
             -- durante clickPlay). Marcamos o save via ModData e zeramos o flag.
             --
             -- Save carregado: verificamos o ModData gravado na sessao anterior.
-            local isChallengeGame = false
 
             if _RankMod_PendingBrasileiraoSetup then
                 _RankMod_PendingBrasileiraoSetup = nil
-                isChallengeGame = true
+                _isChallengeGame = true
                 pcall(function()
                     local p2 = getPlayer()
                     if p2 then
@@ -198,14 +240,35 @@ local function onGameStart()
                 pcall(function()
                     local p2 = getPlayer()
                     if p2 and p2:getModData()["PZCommunityRank_IsChallenge"] then
-                        isChallengeGame = true
+                        _isChallengeGame = true
                         RankLog.info("OnGameStart: save do desafio BRASILEIRAO detectado.")
                     end
                 end)
             end
 
-            if isChallengeGame then
+            -- Para jogo de desafio: restaura desclassificacao previa (save carregado)
+            -- e verifica/corrige o sandbox antes do sync inicial.
+            if _isChallengeGame then
+                pcall(function()
+                    local p2 = getPlayer()
+                    if p2 and p2:getModData()["PZCommunityRank_SandboxViolation"] then
+                        _sandboxViolationDetected = true
+                        RankLog.warn("OnGameStart: save com desclassificacao previa - sandbox_ok=false.")
+                    end
+                end)
+                RankLog.info("OnGameStart: verificando e corrigindo sandbox do desafio...")
                 pcall(function() RankSandbox.verifyAndCorrect() end)
+            end
+
+            -- Sync inicial apos carregamento estavel (e apos correcao de sandbox).
+            RankLog.info("OnGameStart: sync inicial")
+            local ok, player = pcall(getPlayer)
+            if ok and player and isLocalPlayer(player) then
+                safeSilentUpdate(player, 0)
+            end
+
+            if not _isChallengeGame then
+                pcall(function() RankSandbox.check(false) end)
             end
         end
     end
@@ -262,8 +325,13 @@ pcall(function()
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
+        if _isChallengeGame then
+            local p2 = player
+            pcall(function() checkAndDisqualify(p2) end)
+        else
+            pcall(function() RankSandbox.check(false) end)
+        end
         safeSilentUpdate(player, 0)
-        pcall(function() RankSandbox.check(false) end)
     end)
 end)
 
@@ -303,22 +371,43 @@ pcall(function()
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
+        if _isChallengeGame then
+            local p2 = player
+            pcall(function() checkAndDisqualify(p2) end)
+        end
         safeSilentUpdate(player, 0)
     end)
 end)
 
--- -- Atualizacao periodica a cada ~5 min --------------------
+-- -- Verificacao + correcao periodica do desafio (~5 min) ---
+-- Para jogos de desafio: verifica o sandbox e aplica correcoes se necessario,
+-- depois sincroniza o arquivo. Garante que alteracoes externas (outros mods,
+-- configuracoes manuais) sejam revertidas automaticamente.
 Events.OnTick.Add(function()
     _periodicTick = _periodicTick + 1
     if _periodicTick < PERIODIC_TICKS then return end
     _periodicTick = 0
 
     if _isStartingUp then return end
-    RankLog.info("Periodic: ~5 min - disparando sync")
+
     local ok, player = pcall(getPlayer)
     if not ok or not player then return end
     if not isLocalPlayer(player) then return end
+
+    if _isChallengeGame then
+        RankLog.info("Periodic: ~5 min - verificando preset completo do desafio")
+        local capturedPlayer = player
+        local presetOk = false
+        pcall(function() presetOk = checkAndDisqualify(capturedPlayer) end)
+        if not presetOk then
+            RankLog.warn("Periodic: violacoes corrigidas" ..
+                (_sandboxViolationDetected and " - jogador DESCLASSIFICADO." or "."))
+        end
+    else
+        RankLog.info("Periodic: ~5 min - disparando sync")
+    end
+
     safeSilentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado - B42.19+ | v2.2.3")
+RankLog.info("Mod carregado - B42.19+ | v2.2.8")

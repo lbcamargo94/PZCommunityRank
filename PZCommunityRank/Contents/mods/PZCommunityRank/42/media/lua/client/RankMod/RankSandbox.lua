@@ -268,6 +268,51 @@ function RankSandbox.verifyAndCorrect()
     return false
 end
 
+-- Verifica todos os valores numericos e booleanos de BRASILEIRAO_CHALLENGE_PRESET
+-- contra o SandboxVars ativo. Nao corrige - apenas detecta.
+-- Retorna (ok, violations) onde violations = lista de { key, expected, got }.
+function RankSandbox.verifyFullPreset()
+    local preset = BRASILEIRAO_CHALLENGE_PRESET
+    if not preset then
+        RankLog.warn("verifyFullPreset: BRASILEIRAO_CHALLENGE_PRESET indisponivel.")
+        return true, {}
+    end
+
+    local violations = {}
+
+    local function flatCheck(tbl, prefix)
+        if type(tbl) ~= "table" then return end
+        for k, v in pairs(tbl) do
+            if k ~= "Version" then
+                local key = prefix and (prefix .. "." .. k) or k
+                if type(v) == "table" then
+                    flatCheck(v, key)
+                elseif type(v) == "number" or type(v) == "boolean" then
+                    local actual = readVar(key)
+                    if actual ~= nil and not valuesMatch(actual, v, 0.01) then
+                        table.insert(violations, { key = key, expected = v, got = actual })
+                    end
+                end
+            end
+        end
+    end
+
+    flatCheck(preset, nil)
+
+    if #violations > 0 then
+        RankLog.warn(string.format(
+            "verifyFullPreset: %d violacao(es) encontrada(s).", #violations))
+        for _, vi in ipairs(violations) do
+            RankLog.warn(string.format("  X  %s: esperado=%s atual=%s",
+                vi.key, tostring(vi.expected), tostring(vi.got)))
+        end
+    else
+        RankLog.info("verifyFullPreset: preset completo OK.")
+    end
+
+    return #violations == 0, violations
+end
+
 -- -- API publica -------------------------------------------------------------
 
 function RankSandbox.check(showMissing)
