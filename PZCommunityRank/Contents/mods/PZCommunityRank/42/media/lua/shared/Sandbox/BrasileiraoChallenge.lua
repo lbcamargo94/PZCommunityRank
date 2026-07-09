@@ -1,14 +1,13 @@
 -- ============================================================
 --  BrasileiraoChallenge.lua - Preset Sandbox do BRASILEIRAO PZ
 --
---  Carregado automaticamente pelo jogo via getSandboxPreset()
---  quando o jogador seleciona o modo BRASILEIRAO PZ na tela
---  de Nova Partida.
+--  Define BRASILEIRAO_CHALLENGE_PRESET como global Lua para que
+--  RankGameMode.lua possa aplica-lo diretamente ao SandboxVars.
 --
---  Valores extraidos do preset oficial "Brasileirao PZ.cfg"
+--  Valores extraidos do preset oficial "DesafioPZ.cfg"
 --  e mantidos em sincronia com RankSandbox.lua.
 -- ============================================================
-return {
+BRASILEIRAO_CHALLENGE_PRESET = {
     Version = 6,
 
     -- ZUMBIS - Populacao
@@ -17,11 +16,11 @@ return {
         PopulationStartMultiplier = 2.0,
         PopulationPeakMultiplier  = 2.0,
         PopulationPeakDay         = 1,
-        RespawnHours              = 72.0,
-        RespawnUnseenHours        = 16.0,
-        RespawnMultiplier         = 0.1,
+        RespawnHours              = 0.0,   -- Nenhum respawn
+        RespawnUnseenHours        = 0.0,
+        RespawnMultiplier         = 0.0,
         RedistributeHours         = 12.0,
-        FollowSoundDistance       = 100,
+        FollowSoundDistance       = 250,
         RallyGroupSize            = 1,
         RallyGroupSizeVariance    = 50,
         RallyTravelDistance       = 20,
@@ -32,16 +31,16 @@ return {
 
     -- ZUMBIS - Comportamento
     ZombieLore = {
-        Speed                    = 4,   -- Aleatorio
+        Speed                    = 2,   -- Normal
         SprinterPercentage       = 0,   -- Nenhum corredor
         Strength                 = 1,   -- Super-humano
-        Toughness                = 1,   -- Resistente
+        Toughness                = 2,   -- Normal
         Transmission             = 1,
         Mortality                = 5,
-        Reanimate                = 3,
+        Reanimate                = 1,   -- Instantaneo
         Cognition                = 1,   -- Avancado (abre portas)
         DoorOpeningPercentage    = 0,
-        CrawlUnderVehicle        = 5,
+        CrawlUnderVehicle        = 6,   -- Muito Frequentemente
         Memory                   = 1,   -- Longa
         Sight                    = 1,   -- Aguia
         Hearing                  = 1,   -- Alta
@@ -54,13 +53,13 @@ return {
         ZombiesCrawlersDragDown  = true,
         ZombiesFenceLunge        = true,
         ZombiesArmorFactor       = 2.0,
-        ZombiesMaxDefense        = 85,
-        ChanceOfAttachedWeapon   = 6,
+        ZombiesMaxDefense        = 90,
+        ChanceOfAttachedWeapon   = 10,
         ZombiesFallDamage        = 1.0,
         DisableFakeDead          = 2,   -- Total (incl. mortos pelo jogador)
-        PlayerSpawnZombieRemoval = 1,
+        PlayerSpawnZombieRemoval = 4,
         FenceThumpersRequired    = 25,
-        FenceDamageMultiplier    = 1.0,
+        FenceDamageMultiplier    = 1.3,
     },
 
     -- LOOT - todas as categorias em 0.04 (Muito Baixo)
@@ -88,7 +87,7 @@ return {
     RollsMultiplier      = 1.0,
     RemoveStoryLoot      = false,
     RemoveZombieLoot     = false,
-    ZombiePopLootEffect  = 0,
+    ZombiePopLootEffect  = 5,
     InsaneLootFactor     = 0.05,
     ExtremeLootFactor    = 0.2,
     RareLootFactor       = 0.6,
@@ -112,10 +111,10 @@ return {
     FogCycle             = 1,
     WaterShut            = 1,   -- Instantaneo
     ElecShut             = 1,   -- Instantaneo
-    WaterShutModifier    = 0,
-    ElecShutModifier     = 0,
+    WaterShutModifier    = 14,  -- Agua corta 14 dias apos inicio
+    ElecShutModifier     = 14,  -- Luz corta 14 dias apos inicio
     AlarmDecay           = 6,   -- 0-5 Anos
-    AlarmDecayModifier   = 0,
+    AlarmDecayModifier   = 14,  -- Baterias morrem 14 dias apos inicio
 
     -- TEMPO / NATUREZA
     Temperature          = 2,   -- Frio
@@ -128,7 +127,7 @@ return {
     CompostTime          = 2,
     FishAbundance        = 1,   -- Muito Ruim
     NatureAbundance      = 1,   -- Muito Ruim
-    PlantResilience      = 3,
+    PlantResilience      = 5,   -- Muito Baixo
     PlantAbundance       = 3,
 
     -- EVENTOS
@@ -151,7 +150,7 @@ return {
     BloodLevel           = 3,
     ClothingDegradation  = 3,
     NegativeTraitsPenalty = 1,
-    MuscleStrainFactor   = 0.7,
+    MuscleStrainFactor   = 0.8,
     DiscomfortFactor     = 0.8,
     WoundInfectionFactor = 1.0,
     EasyClimbing         = false,
@@ -212,19 +211,19 @@ return {
     InitialGas           = 1,   -- Muito Baixo
     FuelStationGasInfinite = false,
     FuelStationGasMin    = 0.0,
-    FuelStationGasMax    = 0.2,
-    FuelStationGasEmptyChance = 50,
+    FuelStationGasMax    = 0.8,
+    FuelStationGasEmptyChance = 20,
     LockedCar            = 6,   -- Muito Frequentemente
     CarGasConsumption    = 1.0,
     CarGeneralCondition  = 1,   -- Muito Baixo
     CarDamageOnImpact    = 3,
-    DamageToPlayerFromHitByACar = 1,
+    DamageToPlayerFromHitByACar = 3,   -- Normal
     TrafficJam           = true,
-    CarAlarm             = 3,
+    CarAlarm             = 6,   -- Muito Frequentemente
     PlayerDamageFromCrash = true,
     SirenShutoffHours    = 0.0,
     RecentlySurvivorVehicles = 2,
-    ZombieAttractionMultiplier = 1.0,
+    ZombieAttractionMultiplier = 1.3,
     VehicleEasyUse       = false,
     SirenEffectsZombies  = true,
 
@@ -233,7 +232,7 @@ return {
     GeneratorSpawning    = 1,   -- Extremamente Raro
     GeneratorTileRange   = 20,
     GeneratorVerticalPowerRange = 3,
-    AnnotatedMapChance   = 4,
+    AnnotatedMapChance   = 3,   -- Raro
 
     -- ANIMAIS
     AnimalStatsModifier      = 4,
@@ -253,7 +252,7 @@ return {
 
     -- AMBIENTE
     FireSpread           = true,
-    HoursForCorpseRemoval = 216.0,
+    HoursForCorpseRemoval = 108.0,
     DecayingCorpseHealthImpact = 3,
     ZombieHealthImpact   = false,
     BloodSplatLifespanDays = 0,
@@ -282,7 +281,7 @@ return {
     MaggotSpawn          = 1,
     LightBulbLifespan    = 2.0,
     NoBlackClothes       = true,
-    MaximumFireFuelHours = 8,
+    MaximumFireFuelHours = 12,
     KillInsideCrops      = true,
     PlantGrowingSeasons  = true,
     PlaceDirtAboveground = false,
@@ -300,7 +299,7 @@ return {
 
     -- ARMAS DE FOGO
     FirearmUseDamageChance   = 2,
-    FirearmNoiseMultiplier   = 1.0,
+    FirearmNoiseMultiplier   = 1.3,
     FirearmJamMultiplier     = 1.0,
     FirearmMoodleMultiplier  = 1.0,
     FirearmWeatherMultiplier = 1.0,
@@ -316,6 +315,7 @@ return {
 
     -- PORAO
     Basement = {
-        SpawnFrequency = 4,
+        SpawnFrequency = 6,
     },
 }
+return BRASILEIRAO_CHALLENGE_PRESET

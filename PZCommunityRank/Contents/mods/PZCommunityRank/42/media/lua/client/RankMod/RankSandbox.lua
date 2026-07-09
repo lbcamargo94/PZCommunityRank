@@ -50,16 +50,17 @@ local RULES = {
     { key = "ZombieConfig.PopulationPeakDay",          expected = 1,   label = "Dia do Pico" },
 
     -- [ ZUMBIS - Comportamento ]
-    -- Speed 4=Aleatorio; SprinterPercentage=0 garante "nenhum corredor"
-    { key = "ZombieLore.Speed",                        expected = 4,    label = "Velocidade (Aleatorio=4)" },
+    { key = "ZombieLore.Speed",                        expected = 2,    label = "Velocidade (Normal=2)" },
     { key = "ZombieLore.SprinterPercentage",           expected = 0,    label = "% Corredores (0)" },
     { key = "ZombieLore.Strength",                     expected = 1,    label = "Forca (Super-humano=1)" },
-    { key = "ZombieLore.Toughness",                    expected = 1,    label = "Resistencia (Resistente=1)" },
+    { key = "ZombieLore.Toughness",                    expected = 2,    label = "Resistencia (Normal=2)" },
+    { key = "ZombieLore.Reanimate",                    expected = 1,    label = "Reanimacao (Instantaneo=1)" },
     { key = "ZombieLore.Hearing",                      expected = 1,    label = "Audicao (Alta=1)" },
     { key = "ZombieLore.Sight",                        expected = 1,    label = "Visao (Aguia=1)" },
     { key = "ZombieLore.Memory",                       expected = 1,    label = "Memoria (Longa=1)" },
     { key = "ZombieLore.Cognition",                    expected = 1,    label = "Percepcao/Portas (Avancado=1)" },
-    { key = "ZombieConfig.FollowSoundDistance",        expected = 100,  label = "Raio de Audicao (100)" },
+    { key = "ZombieConfig.FollowSoundDistance",        expected = 250,  label = "Raio de Audicao (250)" },
+    { key = "ZombieConfig.RespawnHours",               expected = 0.0,  label = "Respawn (Nenhum=0)",          tol = 0.01 },
     { key = "ZombieLore.DisableFakeDead",              expected = 2,    label = "Fake Dead Total (2)" },
     { key = "ZombieLore.ZombiesCrawlersDragDown",      expected = true, label = "Rastejadores Derrubam" },
     { key = "ZombieConfig.RallyGroupSize",             expected = 1,    label = "Tamanho da Horda (1)" },
@@ -214,9 +215,21 @@ function RankSandbox.applyRules()
             RankLog.warn("applyRules: falha em " .. rule.key .. ": " .. tostring(err))
         end
     end
-    -- Sincroniza SandboxVars (Lua) -> SandboxOptions (Java).
-    -- Garante que o motor de jogo use os valores corrigidos.
-    pcall(function() getSandboxOptions():fromLua() end)
+    -- Sincroniza cada valor para o objeto Java SandboxOptions.
+    -- getSandboxOptions():fromLua() nao existe no B42.19; usamos getOptionByName
+    -- + parse/setValue + set, igual ao ISServerSandboxOptionsUI (linha 739).
+    for _, rule in ipairs(RULES) do
+        pcall(function()
+            local opt = getSandboxOptions():getOptionByName(rule.key)
+            if not opt then return end
+            if type(rule.expected) == "boolean" then
+                opt:setValue(rule.expected)
+            else
+                opt:parse(tostring(rule.expected))
+            end
+            getSandboxOptions():set(opt:getName(), opt:getValue())
+        end)
+    end
     RankLog.info(string.format("applyRules: %d/%d aplicados, %d falhos.", applied, #RULES, failed))
     return applied
 end

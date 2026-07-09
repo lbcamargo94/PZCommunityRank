@@ -8,6 +8,7 @@
 -- ============================================================
 
 require "RankMod/RankLog"
+require "RankMod/RankSandbox"
 
 -- Constantes
 
@@ -38,6 +39,109 @@ table.insert(NewGameScreen.defaultGameModeData, 1, {
 
 RankLog.info("RankGameMode: modo '" .. MODE_TITLE .. "' registrado.")
 
+-- Gera/atualiza DesafioPZ.cfg em Zomboid/Sandbox Presets/ a partir do preset Lua.
+--
+--  Cria um SandboxOptions.new() limpo, aplica todos os valores de
+--  BRASILEIRAO_CHALLENGE_PRESET via getOptionByName + parse/setValue,
+--  e salva com savePresetFile("DesafioPZ"). O arquivo passa a aparecer
+--  na lista de presets da tela de Sandbox para qualquer nova partida.
+--  Chamado ao entrar no menu principal (OnMainMenuEnter) e em cada nova partida de desafio.
+
+local function saveDesafioCfg()
+    local preset = BRASILEIRAO_CHALLENGE_PRESET
+    if not preset then return end
+
+    local ok, err = pcall(function()
+        local opts = SandboxOptions.new()
+        if not opts then return end
+
+        local function applyToOpts(tbl, prefix)
+            if type(tbl) ~= "table" then return end
+            for k, v in pairs(tbl) do
+                if k ~= "Version" then
+                    local key = prefix and (prefix .. "." .. k) or k
+                    if type(v) == "table" then
+                        applyToOpts(v, key)
+                    else
+                        pcall(function()
+                            local opt = opts:getOptionByName(key)
+                            if not opt then return end
+                            if type(v) == "boolean" then
+                                opt:setValue(v)
+                            else
+                                opt:parse(tostring(v))
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+
+        applyToOpts(preset, nil)
+        opts:savePresetFile("DesafioPZ")
+    end)
+
+    if ok then
+        RankLog.info("RankGameMode: DesafioPZ.cfg salvo em Sandbox Presets.")
+    else
+        RankLog.warn("RankGameMode: falha ao salvar DesafioPZ.cfg: " .. tostring(err))
+    end
+end
+
+-- Aplica o preset BRASILEIRAO diretamente ao SandboxVars e Java SandboxOptions.
+--
+--  Fluxo:
+--    1. saveDesafioCfg()        -> garante que DesafioPZ.cfg esta atualizado
+--    2. applyValues(SandboxVars) -> garante que SandboxVars reflete o preset Lua
+--    3. applyRules()             -> sincroniza os 56 valores criticos para Java
+
+local function applyBrasileiraoPreset()
+    local preset = BRASILEIRAO_CHALLENGE_PRESET
+    if not preset then
+        RankLog.warn("RankGameMode: BRASILEIRAO_CHALLENGE_PRESET nao disponivel - usando RankSandbox.applyRules().")
+        pcall(function() RankSandbox.applyRules() end)
+        return false
+    end
+
+    -- Garante que DesafioPZ.cfg esta atualizado em Zomboid/Sandbox Presets/.
+    saveDesafioCfg()
+
+    -- Aplica recursivamente os valores do preset ao SandboxVars.
+    -- Sub-tabelas (ZombieConfig, ZombieLore, etc.) sao percorridas;
+    -- Version e ignorado pois nao e um campo do SandboxVars.
+    local function applyValues(src, dst)
+        if type(src) ~= "table" then return end
+        for k, v in pairs(src) do
+            if k ~= "Version" then
+                if type(v) == "table" then
+                    local child = dst[k]
+                    local ct = type(child)
+                    if ct == "table" or ct == "userdata" then
+                        applyValues(v, child)
+                    end
+                else
+                    pcall(function() dst[k] = v end)
+                end
+            end
+        end
+    end
+
+    local ok, err = pcall(function()
+        applyValues(preset, SandboxVars)
+    end)
+
+    if ok then
+        -- Sincroniza os 56 valores criticos para Java SandboxOptions via applyRules.
+        pcall(function() RankSandbox.applyRules() end)
+        RankLog.info("RankGameMode: preset BRASILEIRAO aplicado via SandboxVars.")
+        return true
+    else
+        RankLog.warn("RankGameMode: erro ao aplicar preset: " .. tostring(err))
+        pcall(function() RankSandbox.applyRules() end)
+        return false
+    end
+end
+
 -- Hook: clickPlay
 --
 --  O botao "Next" da NewGameScreen chama self:clickPlay().
@@ -49,11 +153,11 @@ RankLog.info("RankGameMode: modo '" .. MODE_TITLE .. "' registrado.")
 --     Alem disso, clickPlay nao sobrescreve nosso preset (linha 435 ignorada
 --     quando mode == Sandbox).
 --
---  2. Apos clickPlay: aplica nosso preset (sobrepoe setDefaultSandboxVars),
---     depois muda getGameMode() de volta para Apocalypse. Com isso, quando
---     o jogador clicar "Next" no spawn select, clickNext (linha 652) ve
---     getGameMode() != "Sandbox" e vai direto para criacao de personagem,
---     pulando a tela de opcoes de sandbox.
+--  2. Apos clickPlay: aplica nosso preset diretamente ao SandboxVars
+--     (sobrepoe setDefaultSandboxVars), depois muda getGameMode() de volta
+--     para Apocalypse. Com isso, quando o jogador clicar "Next" no spawn
+--     select, clickNext ve getGameMode() != "Sandbox" e vai direto para
+--     criacao de personagem, pulando a tela de opcoes de sandbox.
 
 local _origClickPlay = NewGameScreen.clickPlay
 
@@ -76,16 +180,8 @@ NewGameScreen.clickPlay = function(self)
     if isBrasileirao then
         self.selectedItem.data.mode = MODE_ID
 
-        -- Aplica nosso preset apos setDefaultSandboxVars() do clickPlay
-        local ok, err = pcall(function()
-            local preset = MainScreen.instance.sandOptions:getSandboxPreset(MODE_ID)
-            MainScreen.instance:setSandboxPreset(preset)
-        end)
-        if ok then
-            RankLog.info("RankGameMode: preset '" .. MODE_ID .. "' aplicado.")
-        else
-            RankLog.warn("RankGameMode: erro ao aplicar preset: " .. tostring(err))
-        end
+        -- Aplica preset apos setDefaultSandboxVars() (chamado dentro do clickPlay)
+        applyBrasileiraoPreset()
 
         -- Volta para Apocalypse: fillList ja rodou em Sandbox (lista populada),
         -- agora clickNext vera getGameMode() != "Sandbox" e vai para char creation
@@ -98,3 +194,13 @@ NewGameScreen.clickPlay = function(self)
 end
 
 RankLog.info("RankGameMode: hook clickPlay instalado.")
+
+-- Instala DesafioPZ.cfg em Zomboid/Sandbox Presets/ ao entrar no menu principal,
+-- para que o preset apareca na lista da tela de Sandbox.
+-- O flag evita reinstalacao desnecessaria a cada entrada no menu.
+local _cfgInstalled = false
+Events.OnMainMenuEnter.Add(function()
+    if _cfgInstalled then return end
+    _cfgInstalled = true
+    saveDesafioCfg()
+end)
