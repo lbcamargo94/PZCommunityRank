@@ -96,50 +96,18 @@ end
 --    3. applyRules()             -> sincroniza os 56 valores criticos para Java
 
 local function applyBrasileiraoPreset()
-    local preset = BRASILEIRAO_CHALLENGE_PRESET
-    if not preset then
-        RankLog.warn("RankGameMode: BRASILEIRAO_CHALLENGE_PRESET nao disponivel - usando RankSandbox.applyRules().")
+    if not BRASILEIRAO_CHALLENGE_PRESET then
+        RankLog.warn("RankGameMode: BRASILEIRAO_CHALLENGE_PRESET nao disponivel - usando applyRules().")
         pcall(function() RankSandbox.applyRules() end)
         return false
     end
 
-    -- Garante que DesafioPZ.cfg esta atualizado em Zomboid/Sandbox Presets/.
     saveDesafioCfg()
 
-    -- Aplica recursivamente os valores do preset ao SandboxVars.
-    -- Sub-tabelas (ZombieConfig, ZombieLore, etc.) sao percorridas;
-    -- Version e ignorado pois nao e um campo do SandboxVars.
-    local function applyValues(src, dst)
-        if type(src) ~= "table" then return end
-        for k, v in pairs(src) do
-            if k ~= "Version" then
-                if type(v) == "table" then
-                    local child = dst[k]
-                    local ct = type(child)
-                    if ct == "table" or ct == "userdata" then
-                        applyValues(v, child)
-                    end
-                else
-                    pcall(function() dst[k] = v end)
-                end
-            end
-        end
-    end
-
-    local ok, err = pcall(function()
-        applyValues(preset, SandboxVars)
-    end)
-
-    if ok then
-        -- Sincroniza os 56 valores criticos para Java SandboxOptions via applyRules.
-        pcall(function() RankSandbox.applyRules() end)
-        RankLog.info("RankGameMode: preset BRASILEIRAO aplicado via SandboxVars.")
-        return true
-    else
-        RankLog.warn("RankGameMode: erro ao aplicar preset: " .. tostring(err))
-        pcall(function() RankSandbox.applyRules() end)
-        return false
-    end
+    local ok = false
+    pcall(function() ok = RankSandbox.applyFullPreset() end)
+    RankLog.info("RankGameMode: preset BRASILEIRAO aplicado.")
+    return ok
 end
 
 -- Hook: clickPlay

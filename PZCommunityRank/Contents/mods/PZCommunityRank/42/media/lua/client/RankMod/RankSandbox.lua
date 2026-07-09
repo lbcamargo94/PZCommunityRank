@@ -313,6 +313,42 @@ function RankSandbox.verifyFullPreset()
     return #violations == 0, violations
 end
 
+-- Aplica recursivamente TODOS os valores de BRASILEIRAO_CHALLENGE_PRESET
+-- ao SandboxVars ativo e sincroniza os 56 valores criticos via applyRules().
+-- Garante que saves em andamento recebam o preset atualizado ao carregar.
+function RankSandbox.applyFullPreset()
+    local preset = BRASILEIRAO_CHALLENGE_PRESET
+    if not preset then
+        RankLog.warn("applyFullPreset: BRASILEIRAO_CHALLENGE_PRESET indisponivel.")
+        return false
+    end
+
+    local function applyValues(src, dst)
+        if type(src) ~= "table" then return end
+        for k, v in pairs(src) do
+            if k ~= "Version" then
+                if type(v) == "table" then
+                    local child = dst[k]
+                    if type(child) == "table" or type(child) == "userdata" then
+                        applyValues(v, child)
+                    end
+                else
+                    pcall(function() dst[k] = v end)
+                end
+            end
+        end
+    end
+
+    local ok = pcall(function() applyValues(preset, SandboxVars) end)
+    RankSandbox.applyRules()
+    if ok then
+        RankLog.info("applyFullPreset: preset completo aplicado ao SandboxVars.")
+    else
+        RankLog.warn("applyFullPreset: erro parcial ao aplicar preset - applyRules aplicado.")
+    end
+    return ok
+end
+
 -- -- API publica -------------------------------------------------------------
 
 function RankSandbox.check(showMissing)

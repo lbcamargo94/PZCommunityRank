@@ -247,7 +247,8 @@ local function onGameStart()
             end
 
             -- Para jogo de desafio: restaura desclassificacao previa (save carregado)
-            -- e verifica/corrige o sandbox antes do sync inicial.
+            -- e reaaplica o preset completo para garantir que saves anteriores ao
+            -- v2.2.9 recebam todos os valores atualizados (nao apenas os 56 do RULES).
             if _isChallengeGame then
                 pcall(function()
                     local p2 = getPlayer()
@@ -256,8 +257,8 @@ local function onGameStart()
                         RankLog.warn("OnGameStart: save com desclassificacao previa - sandbox_ok=false.")
                     end
                 end)
-                RankLog.info("OnGameStart: verificando e corrigindo sandbox do desafio...")
-                pcall(function() RankSandbox.verifyAndCorrect() end)
+                RankLog.info("OnGameStart: reaplicando preset completo do desafio...")
+                pcall(function() RankSandbox.applyFullPreset() end)
             end
 
             -- Sync inicial apos carregamento estavel (e apos correcao de sandbox).
@@ -410,4 +411,4 @@ Events.OnTick.Add(function()
     safeSilentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado - B42.19+ | v2.2.8")
+RankLog.info("Mod carregado - B42.19+ | v2.2.9")
