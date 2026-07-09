@@ -19,7 +19,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
         RespawnHours              = 0.0,   -- Nenhum respawn
         RespawnUnseenHours        = 0.0,
         RespawnMultiplier         = 0.0,
-        RedistributeHours         = 12.0,
+        RedistributeHours         = 24.0,
         FollowSoundDistance       = 250,
         RallyGroupSize            = 1,
         RallyGroupSizeVariance    = 50,
@@ -111,8 +111,8 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     FogCycle             = 1,
     WaterShut            = 1,   -- Instantaneo
     ElecShut             = 1,   -- Instantaneo
-    WaterShutModifier    = 14,  -- Agua corta 14 dias apos inicio
-    ElecShutModifier     = 14,  -- Luz corta 14 dias apos inicio
+    WaterShutModifier    = -1,  -- -1 = ja desligado (novo jogo e saves existentes)
+    ElecShutModifier     = -1,  -- -1 = ja desligado (novo jogo e saves existentes)
     AlarmDecay           = 6,   -- 0-5 Anos
     AlarmDecayModifier   = 14,  -- Baterias morrem 14 dias apos inicio
 
