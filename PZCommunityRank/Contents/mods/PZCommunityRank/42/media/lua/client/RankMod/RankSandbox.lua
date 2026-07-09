@@ -314,8 +314,9 @@ function RankSandbox.verifyFullPreset()
 end
 
 -- Aplica recursivamente TODOS os valores de BRASILEIRAO_CHALLENGE_PRESET
--- ao SandboxVars ativo e sincroniza os 56 valores criticos via applyRules().
--- Garante que saves em andamento recebam o preset atualizado ao carregar.
+-- ao SandboxVars (Lua) E ao getSandboxOptions() (Java) via getOptionByName.
+-- Garante que saves em andamento recebam o preset atualizado ao carregar,
+-- inclusive em sistemas Java (IA de zumbis, veiculos, eventos de mundo).
 function RankSandbox.applyFullPreset()
     local preset = BRASILEIRAO_CHALLENGE_PRESET
     if not preset then
@@ -323,6 +324,7 @@ function RankSandbox.applyFullPreset()
         return false
     end
 
+    -- Etapa 1: SandboxVars (Lua) - lido pela logica de jogo escrita em Lua.
     local function applyValues(src, dst)
         if type(src) ~= "table" then return end
         for k, v in pairs(src) do
@@ -338,15 +340,36 @@ function RankSandbox.applyFullPreset()
             end
         end
     end
+    pcall(function() applyValues(preset, SandboxVars) end)
 
-    local ok = pcall(function() applyValues(preset, SandboxVars) end)
-    RankSandbox.applyRules()
-    if ok then
-        RankLog.info("applyFullPreset: preset completo aplicado ao SandboxVars.")
-    else
-        RankLog.warn("applyFullPreset: erro parcial ao aplicar preset - applyRules aplicado.")
+    -- Etapa 2: getSandboxOptions() (Java) - lido pela engine (IA, fisica, eventos).
+    -- Mesmo padrao de saveDesafioCfg(), mas na instancia ativa em vez de new().
+    local function syncToJava(tbl, prefix)
+        if type(tbl) ~= "table" then return end
+        for k, v in pairs(tbl) do
+            if k ~= "Version" then
+                local key = prefix and (prefix .. "." .. k) or k
+                if type(v) == "table" then
+                    syncToJava(v, key)
+                else
+                    pcall(function()
+                        local opt = getSandboxOptions():getOptionByName(key)
+                        if not opt then return end
+                        if type(v) == "boolean" then
+                            opt:setValue(v)
+                        else
+                            opt:parse(tostring(v))
+                        end
+                        getSandboxOptions():set(opt:getName(), opt:getValue())
+                    end)
+                end
+            end
+        end
     end
-    return ok
+    pcall(function() syncToJava(preset, nil) end)
+
+    RankLog.info("applyFullPreset: preset completo aplicado ao SandboxVars e SandboxOptions.")
+    return true
 end
 
 -- -- API publica -------------------------------------------------------------
