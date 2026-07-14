@@ -61,6 +61,8 @@ local RULES = {
     { key = "ZombieLore.Cognition",                    expected = 1,    label = "Percepcao/Portas (Avancado=1)" },
     { key = "ZombieConfig.FollowSoundDistance",        expected = 250,  label = "Raio de Audicao (250)" },
     { key = "ZombieConfig.RespawnHours",               expected = 0.0,  label = "Respawn (Nenhum=0)",          tol = 0.01 },
+    { key = "ZombieConfig.RedistributeHours",          expected = 48.0, label = "Migracao de Zumbis (48h)",     tol = 0.5  },
+    { key = "ZombieConfig.RallyGroupSizeVariance",     expected = 20,   label = "Variancia Horda (20)" },
     { key = "ZombieLore.DisableFakeDead",              expected = 2,    label = "Fake Dead Total (2)" },
     { key = "ZombieLore.ZombiesCrawlersDragDown",      expected = true, label = "Rastejadores Derrubam" },
     { key = "ZombieConfig.RallyGroupSize",             expected = 1,    label = "Tamanho da Horda (1)" },
@@ -90,6 +92,7 @@ local RULES = {
     { key = "GeneratorSpawning",    expected = 1,    label = "Geradores (Ext.Raro=1)" },
 
     -- [ MUNDO ]
+    { key = "ZombieVoronoiNoise", expected = false, label = "Voronoi Noise (Desativado)" },
     { key = "WaterShut",  expected = 1, label = "Agua Instantanea (1)" },
     { key = "ElecShut",   expected = 1, label = "Eletric. Instantanea (1)" },
     { key = "AlarmDecay", expected = 6, label = "Bateria Alarme (0-5 Anos=6)" },
@@ -103,7 +106,7 @@ local RULES = {
     { key = "NatureAbundance",expected = 1, label = "Natureza (Muito Ruim=1)" },
 
     -- [ AMBIENTE ]
-    { key = "MetaEvent", expected = 3, label = "Eventos Aleatorios (Freq.=3)" },
+    { key = "MetaEvent", expected = 2, label = "Eventos Aleatorios (AlgumasVezes=2)" },
 
     -- [ PERSONAGEM ]
     { key = "MultiplierConfig.Global", expected = 0.8, label = "Mult. XP Global (0.8)", tol = 0.05 },

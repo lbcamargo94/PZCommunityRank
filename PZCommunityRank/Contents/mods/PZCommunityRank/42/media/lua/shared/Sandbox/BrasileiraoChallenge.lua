@@ -19,10 +19,10 @@ BRASILEIRAO_CHALLENGE_PRESET = {
         RespawnHours              = 0.0,   -- Nenhum respawn
         RespawnUnseenHours        = 0.0,
         RespawnMultiplier         = 0.0,
-        RedistributeHours         = 24.0,
+        RedistributeHours         = 48.0,
         FollowSoundDistance       = 250,
         RallyGroupSize            = 1,
-        RallyGroupSizeVariance    = 50,
+        RallyGroupSizeVariance    = 20,
         RallyTravelDistance       = 20,
         RallyGroupSeparation      = 15,
         RallyGroupRadius          = 3,
@@ -98,7 +98,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     -- MUNDO
     Zombies              = 4,
     Distribution         = 1,
-    ZombieVoronoiNoise   = true,
+    ZombieVoronoiNoise   = false,
     ZombieRespawn        = 4,
     ZombieMigrate        = true,
     DayLength            = 4,
@@ -134,7 +134,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     Alarm                = 6,   -- Muito Frequentemente
     LockedHouses         = 6,
     Helicopter           = 2,
-    MetaEvent            = 3,   -- Frequentemente
+    MetaEvent            = 2,   -- Algumas Vezes
     SleepingEvent        = 1,
 
     -- PERSONAGEM
