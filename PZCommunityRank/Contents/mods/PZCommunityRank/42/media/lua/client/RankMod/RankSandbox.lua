@@ -63,6 +63,7 @@ local RULES = {
     { key = "ZombieConfig.RespawnHours",               expected = 0.0,  label = "Respawn (Nenhum=0)",          tol = 0.01 },
     { key = "ZombieConfig.RedistributeHours",          expected = 48.0, label = "Migracao de Zumbis (48h)",     tol = 0.5  },
     { key = "ZombieConfig.RallyGroupSizeVariance",     expected = 20,   label = "Variancia Horda (20)" },
+    { key = "ZombieConfig.RallyTravelDistance",        expected = 10,   label = "Distancia Rally (10)" },
     { key = "ZombieLore.DisableFakeDead",              expected = 2,    label = "Fake Dead Total (2)" },
     { key = "ZombieLore.ZombiesCrawlersDragDown",      expected = true, label = "Rastejadores Derrubam" },
     { key = "ZombieConfig.RallyGroupSize",             expected = 1,    label = "Tamanho da Horda (1)" },
