@@ -1,8 +1,8 @@
 -- ============================================================
 --  RankCode.lua - Gerador do codigo de submissao
 --
---  Formato atual (antes da ofuscacao) - 9 campos:
---  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|<traits>
+--  Formato atual (antes da ofuscacao) - 10 campos:
+--  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|<traits>|<motivo>
 --
 --  <status>:  "morto" ou "vivo"
 --  <sandbox>: "ok" ou "invalido"
