@@ -10,6 +10,7 @@ require "RankMod/RankFile"
 require "RankMod/RankSandbox"
 require "RankMod/RankGameMode"
 require "RankMod/RankSandboxExport"
+require "RankMod/RankModCheck"
 
 RankMain = {}
 RankMain.submitted = {}
@@ -27,6 +28,14 @@ local _isChallengeGame = false
 -- Uma vez ativado, permanece true pelo resto da sessao mesmo apos correcao.
 -- Persiste via ModData para saves carregados (PZCommunityRank_SandboxViolation).
 local _sandboxViolationDetected = false
+
+-- True se foi detectado uso de modo debug durante o desafio Brasileirao.
+-- Persiste via ModData (PZCommunityRank_DebugViolation).
+local _debugViolationDetected = false
+
+-- True se foi detectado uso de mod nao permitido durante o desafio Brasileirao.
+-- Persiste via ModData (PZCommunityRank_ModViolation).
+local _modViolationDetected = false
 
 -- Ultimo codigo gerado pelo silentUpdate - evita salvar arquivos sem mudanca de estado.
 local _lastSilentCode = nil
@@ -67,6 +76,60 @@ local function checkAndDisqualify(player)
     return presetOk
 end
 
+-- Retorna true se o save atual e um jogo do desafio Brasileirao.
+-- Usa ModData (PZCommunityRank_IsChallenge) para distinguir de sessoes genéricas.
+local function isBrasileiraoGame(player)
+    if not player then return false end
+    local ok, md = pcall(function() return player:getModData() end)
+    return ok and md and md["PZCommunityRank_IsChallenge"] == true
+end
+
+-- Verifica se o modo debug esta ativo durante um jogo Brasileirao.
+-- Se ativo: desclassifica o jogador (permanente na sessao + persistido no ModData).
+local function checkDebugMode(player)
+    if _debugViolationDetected then return end
+    local debugActive = false
+    pcall(function()
+        debugActive = getCore():getDebug() == true
+    end)
+    if not debugActive then return end
+
+    _debugViolationDetected   = true
+    _sandboxViolationDetected = true
+    RankLog.warn("DESCLASSIFICADO: modo debug ativo durante o desafio Brasileirao.")
+    pcall(function()
+        if player then
+            local md = player:getModData()
+            md["PZCommunityRank_SandboxViolation"] = true
+            md["PZCommunityRank_DebugViolation"]   = true
+        end
+    end)
+end
+
+-- Verifica mods ativos contra a whitelist gerada pelo Companion.
+-- Se violacoes encontradas: persiste PZCommunityRank_ModViolation e marca _modViolationDetected.
+-- Retorna true se nenhuma violacao foi detectada (ou whitelist ausente).
+local function checkModViolation(player)
+    if _modViolationDetected then return false end
+
+    local violations = nil
+    pcall(function() violations = RankModCheck.check() end)
+
+    if violations == nil then return true end  -- whitelist ausente, ignora
+    if #violations == 0  then return true end  -- sem violacoes
+
+    _modViolationDetected = true
+    RankLog.warn(string.format("DESCLASSIFICADO: %d mod(s) nao permitido(s) detectado(s).", #violations))
+    for _, v in ipairs(violations) do RankLog.warn("  -> " .. v) end
+
+    pcall(function()
+        if player then
+            player:getModData()["PZCommunityRank_ModViolation"] = true
+        end
+    end)
+    return false
+end
+
 -- Coleta dados, gera codigo, salva arquivo e abre a UI de resultado.
 -- O Companion (app externo) faz o sync via arquivo - nenhuma rede aqui.
 local function triggerRank(player, playerIndex, isDead)
@@ -85,6 +148,11 @@ local function triggerRank(player, playerIndex, isDead)
         return
     end
 
+    -- Checa debug antes de qualquer outra validacao — garante captura mesmo que o
+    -- tick periodico nao tenha disparado ainda (ex: morte nos primeiros 5 minutos).
+    pcall(function() checkDebugMode(player) end)
+    pcall(function() checkModViolation(player) end)
+
     -- Valida sandbox: desclassificacao por preset alterado tem prioridade sobre check pontual.
     local sandboxOk = true
     if _sandboxViolationDetected then
@@ -96,7 +164,19 @@ local function triggerRank(player, playerIndex, isDead)
             RankLog.warn("triggerRank: sandbox invalido - codigo sera marcado como 'invalido'.")
         end
     end
-    entry.sandbox_ok = sandboxOk
+    -- Mod viola prioridade maxima, independente de sandbox/debug
+    local anyViolation = not sandboxOk or _modViolationDetected
+    entry.sandbox_ok = not anyViolation
+    if anyViolation then
+        -- Prioridade: mods > debug > sandbox
+        if _modViolationDetected then
+            entry.disqualification_reason = "mods"
+        elseif _debugViolationDetected then
+            entry.disqualification_reason = "debug"
+        else
+            entry.disqualification_reason = "sandbox"
+        end
+    end
 
     local code = RankCode.generate(entry)
     if not RankCode.isValid(code) then
@@ -129,7 +209,17 @@ local function silentUpdate(player, playerIndex)
     else
         pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
     end
-    entry.sandbox_ok = sandboxOk
+    local anyViolation = not sandboxOk or _modViolationDetected
+    entry.sandbox_ok = not anyViolation
+    if anyViolation then
+        if _modViolationDetected then
+            entry.disqualification_reason = "mods"
+        elseif _debugViolationDetected then
+            entry.disqualification_reason = "debug"
+        else
+            entry.disqualification_reason = "sandbox"
+        end
+    end
 
     local code = RankCode.generate(entry)
     if not RankCode.isValid(code) then return end
@@ -205,6 +295,8 @@ local function onGameStart()
     _periodicTick             = 0
     _isChallengeGame          = false
     _sandboxViolationDetected = false
+    _debugViolationDetected   = false
+    _modViolationDetected     = false
     RankLog.info("OnGameStart: submissoes resetadas.")
 
     -- Grace period: bloqueia OnPlayerDeath nos primeiros 120 ticks para evitar
@@ -243,6 +335,21 @@ local function onGameStart()
                 if p2 and p2:getModData()["PZCommunityRank_SandboxViolation"] then
                     _sandboxViolationDetected = true
                     RankLog.warn("OnGameStart: save com desclassificacao previa - sandbox_ok=false.")
+                end
+            end)
+            pcall(function()
+                local p2 = getPlayer()
+                if p2 and p2:getModData()["PZCommunityRank_DebugViolation"] then
+                    _debugViolationDetected   = true
+                    _sandboxViolationDetected = true
+                    RankLog.warn("OnGameStart: save com desclassificacao por debug previa.")
+                end
+            end)
+            pcall(function()
+                local p2 = getPlayer()
+                if p2 and p2:getModData()["PZCommunityRank_ModViolation"] then
+                    _modViolationDetected = true
+                    RankLog.warn("OnGameStart: save com desclassificacao por mod nao permitido previa.")
                 end
             end)
 
@@ -313,6 +420,8 @@ pcall(function()
         if not isLocalPlayer(player) then return end
         if _isChallengeGame then
             local p2 = player
+            pcall(function() checkDebugMode(p2) end)
+            pcall(function() checkModViolation(p2) end)
             pcall(function() checkAndDisqualify(p2) end)
         else
             pcall(function() RankSandbox.check(false) end)
@@ -359,6 +468,8 @@ pcall(function()
         if not isLocalPlayer(player) then return end
         if _isChallengeGame then
             local p2 = player
+            pcall(function() checkDebugMode(p2) end)
+            pcall(function() checkModViolation(p2) end)
             pcall(function() checkAndDisqualify(p2) end)
         end
         safeSilentUpdate(player, 0)
@@ -383,6 +494,8 @@ Events.OnTick.Add(function()
     if _isChallengeGame then
         RankLog.info("Periodic: ~5 min - verificando preset completo do desafio")
         local capturedPlayer = player
+        pcall(function() checkDebugMode(capturedPlayer) end)
+        pcall(function() checkModViolation(capturedPlayer) end)
         local presetOk = false
         pcall(function() presetOk = checkAndDisqualify(capturedPlayer) end)
         if not presetOk then
@@ -396,4 +509,28 @@ Events.OnTick.Add(function()
     safeSilentUpdate(player, 0)
 end)
 
-RankLog.info("Mod carregado - B42.19+ | v2.2.15")
+-- -- Tela de morte: desabilita "Criar Novo Personagem" no desafio Brasileirao --
+-- ISPostDeathUI.prerender seta buttonRespawn:setVisible() a cada frame.
+-- Sobrescrevemos apos o original rodar e forcamos o botao invisivel quando
+-- PZCommunityRank_IsChallenge = true no ModData do jogador.
+-- O resultado e cacheado no objeto (self._rankIsChallengeGame) para evitar
+-- lookup de ModData a cada frame — o valor nao muda durante a sessao de morte.
+pcall(function()
+    if not ISPostDeathUI then return end
+    local _origPrerender = ISPostDeathUI.prerender
+    ISPostDeathUI.prerender = function(self)
+        _origPrerender(self)
+        if not self.buttonRespawn then return end
+        if not self.buttonRespawn:isVisible() then return end
+        if self._rankIsChallengeGame == nil then
+            local player = getSpecificPlayer(self.playerIndex or 0)
+            self._rankIsChallengeGame = isBrasileiraoGame(player)
+        end
+        if self._rankIsChallengeGame then
+            self.buttonRespawn:setVisible(false)
+        end
+    end
+    RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
+end)
+
+RankLog.info("Mod carregado - B42.19+ | v2.3.1")

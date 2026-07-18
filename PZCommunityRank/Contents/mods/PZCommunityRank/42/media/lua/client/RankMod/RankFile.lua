@@ -47,7 +47,7 @@ function RankFile.save(entry, code)
     local ts     = systemTime()
     local status = entry.is_dead and "Morto" or "Vivo"
 
-    local content = table.concat({
+    local parts = {
         "=== PZ Community Rank ===",
         "Data/Hora : " .. ts,
         "Personagem: " .. (entry.character_name or "Sobrevivente"),
@@ -55,12 +55,17 @@ function RankFile.save(entry, code)
         "Status    : " .. status,
         "Sobrev.   : " .. (entry.time_str       or "?"),
         "Zumbis    : " .. tostring(entry.kills  or 0),
-        "",
-        "--- Codigo de Submissao ---",
-        code,
-        "---",
-        "",
-    }, "\n")
+    }
+    if entry.disqualification_reason then
+        parts[#parts + 1] = "Motivo    : " .. entry.disqualification_reason
+    end
+    parts[#parts + 1] = ""
+    parts[#parts + 1] = "--- Codigo de Submissao ---"
+    parts[#parts + 1] = code
+    parts[#parts + 1] = "---"
+    parts[#parts + 1] = ""
+
+    local content = table.concat(parts, "\n")
 
     local ok, err = pcall(function()
         -- create_dirs=true: cria pz_rank/ se ausente

@@ -19,19 +19,19 @@ BRASILEIRAO_CHALLENGE_PRESET = {
         RespawnHours              = 0.0,   -- Nenhum respawn
         RespawnUnseenHours        = 0.0,
         RespawnMultiplier         = 0.0,
-        RedistributeHours         = 48.0,
+        RedistributeHours         = 24.0,
         FollowSoundDistance       = 250,
         RallyGroupSize            = 1,
-        RallyGroupSizeVariance    = 20,
+        RallyGroupSizeVariance    = 5,
         RallyTravelDistance       = 10,
         RallyGroupSeparation      = 15,
-        RallyGroupRadius          = 3,
+        RallyGroupRadius          = 6,
         ZombiesCountBeforeDelete  = 300,
     },
 
     -- ZUMBIS - Comportamento
     ZombieLore = {
-        Speed                    = 2,   -- Normal
+        Speed                    = 2,   -- Fast Shamblers (Caminhadores Rapidos)
         SprinterPercentage       = 0,   -- Nenhum corredor
         Strength                 = 1,   -- Super-humano
         Toughness                = 2,   -- Normal
