@@ -126,9 +126,10 @@ local function deobfuscate(encoded)
 end
 
 -- Gera o codigo (com prefixo de formato) a partir dos dados coletados
--- PZRX2: 9 campos - nome|profissao|kills|tempo|skills|status|sandbox|traits
--- Campo sandbox: "ok" = configuracoes validas; "invalido" = sandbox diverge do desafio
+-- PZRX2: 10 campos - nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo
+-- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
 -- Campo traits: IDs separados por virgula (ex: "Athletic,Lucky,Smoker")
+-- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
 function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local traitsStr  = table.concat(entry.traits or {}, ",")
@@ -136,8 +137,9 @@ function RankCode.generate(entry)
     local profession = (entry.profession or "Desconhecida"):gsub("|", " ")
     local status     = entry.is_dead and "morto" or "vivo"
     local sandbox    = (entry.sandbox_ok == false) and "invalido" or "ok"
+    local motivo     = (entry.sandbox_ok == false) and (entry.disqualification_reason or "sandbox") or ""
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s",
         charName,
         profession,
         entry.kills or 0,
@@ -145,7 +147,8 @@ function RankCode.generate(entry)
         skillsStr,
         status,
         sandbox,
-        traitsStr
+        traitsStr,
+        motivo
     )
 
     return "PZRX2:" .. obfuscate(plain)
