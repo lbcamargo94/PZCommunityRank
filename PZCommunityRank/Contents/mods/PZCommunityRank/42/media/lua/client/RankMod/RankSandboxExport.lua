@@ -157,6 +157,24 @@ local function captureSandbox()
         end
     end
 
+    -- Leitura explicita de propriedades top-level que podem nao ser iteraveis
+    -- via pairs() em ambientes Kahlua com metatabelas Java (ex: ZombieVoronoiNoise).
+    local TOPLEVEL_EXTRAS = {
+        "ZombieVoronoiNoise", "Zombies", "Distribution",
+        "ZombieRespawn", "ZombieMigrate",
+    }
+    for _, k in ipairs(TOPLEVEL_EXTRAS) do
+        if result[k] == nil then
+            local ok2, v2 = pcall(function() return SandboxVars[k] end)
+            if ok2 and v2 ~= nil then
+                local vt2 = type(v2)
+                if vt2 == 'number' or vt2 == 'boolean' or vt2 == 'string' then
+                    result[k] = v2
+                end
+            end
+        end
+    end
+
     return result
 end
 
