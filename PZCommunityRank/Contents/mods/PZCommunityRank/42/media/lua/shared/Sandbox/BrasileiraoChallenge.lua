@@ -133,8 +133,8 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     -- EVENTOS
     Alarm                = 6,   -- Muito Frequentemente
     LockedHouses         = 6,
-    Helicopter           = 2,
-    MetaEvent            = 2,   -- Algumas Vezes
+    Helicopter           = 1,   -- Nunca
+    MetaEvent            = 1,   -- Nunca
     SleepingEvent        = 1,
 
     -- PERSONAGEM

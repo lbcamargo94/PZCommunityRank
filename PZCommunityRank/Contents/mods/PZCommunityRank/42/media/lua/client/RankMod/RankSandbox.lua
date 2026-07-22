@@ -109,7 +109,8 @@ local RULES = {
     { key = "NatureAbundance",expected = 1, label = "Natureza (Muito Ruim=1)" },
 
     -- [ AMBIENTE ]
-    { key = "MetaEvent", expected = 2, label = "Eventos Aleatorios (AlgumasVezes=2)" },
+    { key = "Helicopter", expected = 1, label = "Helicoptero (Nunca=1)" },
+    { key = "MetaEvent",  expected = 1, label = "Eventos Aleatorios (Nunca=1)" },
 
     -- [ PERSONAGEM ]
     { key = "MultiplierConfig.Global", expected = 0.8, label = "Mult. XP Global (0.8)", tol = 0.05 },
