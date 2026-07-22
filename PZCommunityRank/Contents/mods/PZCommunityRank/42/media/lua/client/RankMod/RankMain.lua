@@ -76,6 +76,36 @@ local function checkAndDisqualify(player)
     return presetOk
 end
 
+-- Verifica se o Companion sinalizou limpeza de violacao via arquivo.
+-- Se encontrado com conteudo "clear": limpa flags de ModData e em memoria,
+-- depois marca o arquivo como consumido para nao repetir na proxima sessao.
+local function checkClearViolationFile(player)
+    local content = nil
+    pcall(function()
+        local r = getFileReader("pz_rank/pz_rank_clear_violation.txt", false)
+        if not r then return end
+        content = r:readLine()
+        r:close()
+    end)
+    if content ~= "clear" then return end
+
+    pcall(function()
+        local md = player:getModData()
+        md["PZCommunityRank_SandboxViolation"] = nil
+        md["PZCommunityRank_DebugViolation"]   = nil
+        md["PZCommunityRank_ModViolation"]     = nil
+    end)
+    _sandboxViolationDetected = false
+    _debugViolationDetected   = false
+    _modViolationDetected     = false
+
+    pcall(function()
+        local w = getFileWriter("pz_rank/pz_rank_clear_violation.txt", false, false)
+        if w then w:write("done") w:close() end
+    end)
+    RankLog.warn("checkClearViolationFile: violacoes limpas via sinal do Companion.")
+end
+
 -- Retorna true se o save atual e um jogo do desafio Brasileirao.
 -- Usa ModData (PZCommunityRank_IsChallenge) para distinguir de sessoes genéricas.
 local function isBrasileiraoGame(player)
@@ -353,6 +383,13 @@ local function onGameStart()
                 end
             end)
 
+            -- Verifica se o Companion sinalizou limpeza de violacao.
+            -- Deve rodar APOS restaurar flags do ModData para poder sobrescreve-las.
+            pcall(function()
+                local p2 = getPlayer()
+                if p2 then checkClearViolationFile(p2) end
+            end)
+
             -- Reaplica o preset completo (SandboxVars + Java SandboxOptions).
             RankLog.info("OnGameStart: reaplicando preset completo do desafio...")
             pcall(function() RankSandbox.applyFullPreset() end)
@@ -533,4 +570,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.19+ | v2.3.3")
+RankLog.info("Mod carregado - B42.19+ | v2.3.4")
