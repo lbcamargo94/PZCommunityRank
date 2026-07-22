@@ -109,7 +109,6 @@ local RULES = {
     { key = "NatureAbundance",expected = 1, label = "Natureza (Muito Ruim=1)" },
 
     -- [ AMBIENTE ]
-    { key = "Helicopter", expected = 1, label = "Helicoptero (Nunca=1)" },
     { key = "MetaEvent",  expected = 1, label = "Eventos Aleatorios (Nunca=1)" },
 
     -- [ PERSONAGEM ]
