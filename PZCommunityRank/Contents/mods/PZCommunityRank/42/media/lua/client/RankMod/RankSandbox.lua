@@ -59,7 +59,7 @@ local RULES = {
     { key = "ZombieLore.Sight",                        expected = 1,    label = "Visao (Aguia=1)" },
     { key = "ZombieLore.Memory",                       expected = 1,    label = "Memoria (Longa=1)" },
     { key = "ZombieLore.Cognition",                    expected = 1,    label = "Percepcao/Portas (Avancado=1)" },
-    { key = "ZombieConfig.FollowSoundDistance",        expected = 250,  label = "Raio de Audicao (250)" },
+    { key = "ZombieConfig.FollowSoundDistance",        expected = 300,  label = "Raio de Audicao (300)" },
     { key = "ZombieConfig.RespawnHours",               expected = 0.0,  label = "Respawn (Nenhum=0)",              tol = 0.01 },
     { key = "ZombieConfig.RedistributeHours",          expected = 24.0, label = "Migracao de Zumbis (24h)",         tol = 0.5  },
     { key = "ZombieConfig.RallyGroupSize",             expected = 1,    label = "Tamanho da Horda (1)" },
