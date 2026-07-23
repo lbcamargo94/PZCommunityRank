@@ -92,21 +92,21 @@ local RULES = {
     { key = "ContainerLootNew",     expected = 0.04, label = "Containers",               tol = 0.01 },
     { key = "KeyLootNew",           expected = 0.04, label = "Chaves",                   tol = 0.01 },
     { key = "OtherLootNew",         expected = 0.04, label = "Outros Itens",             tol = 0.01 },
-    { key = "GeneratorSpawning",    expected = 1,    label = "Geradores (Ext.Raro=1)" },
+    { key = "GeneratorSpawning",    expected = 3,    label = "Geradores (Raro=3)" },
 
     -- [ MUNDO ]
-    { key = "ZombieVoronoiNoise", expected = false, label = "Voronoi Noise (Desativado)" },
+    { key = "ZombieVoronoiNoise", expected = true,  label = "Voronoi Noise (Ativado)" },
     { key = "WaterShut",  expected = 1, label = "Agua Instantanea (1)" },
     { key = "ElecShut",   expected = 1, label = "Eletric. Instantanea (1)" },
     { key = "AlarmDecay", expected = 6, label = "Bateria Alarme (0-5 Anos=6)" },
     { key = "Alarm",      expected = 6, label = "Alarmes Casas (Muito Freq.=6)" },
 
     -- [ NATUREZA ]
-    { key = "NightDarkness",  expected = 2, label = "Escuridao Noite (Escuro=2)" },
+    { key = "NightDarkness",  expected = 3, label = "Escuridao Noite (Normal=3)" },
     { key = "Temperature",    expected = 2, label = "Temperatura (Frio=2)" },
     { key = "Rain",           expected = 2, label = "Chuva (Seco=2)" },
-    { key = "FishAbundance",  expected = 1, label = "Pesca (Muito Ruim=1)" },
-    { key = "NatureAbundance",expected = 1, label = "Natureza (Muito Ruim=1)" },
+    { key = "FishAbundance",  expected = 2, label = "Pesca (Ruim=2)" },
+    { key = "NatureAbundance",expected = 2, label = "Natureza (Ruim=2)" },
 
     -- [ AMBIENTE ]
     { key = "MetaEvent",  expected = 1, label = "Eventos Aleatorios (Nunca=1)" },

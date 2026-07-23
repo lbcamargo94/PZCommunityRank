@@ -98,7 +98,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     -- MUNDO
     Zombies              = 4,
     Distribution         = 1,
-    ZombieVoronoiNoise   = false,
+    ZombieVoronoiNoise   = true,
     ZombieRespawn        = 4,
     ZombieMigrate        = true,
     DayLength            = 4,
@@ -119,14 +119,14 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     -- TEMPO / NATUREZA
     Temperature          = 2,   -- Frio
     Rain                 = 2,   -- Seco
-    NightDarkness        = 2,   -- Escuro
+    NightDarkness        = 3,   -- Normal
     NightLength          = 3,
     ErosionSpeed         = 4,
     ErosionDays          = 0,
-    Farming              = 3,
+    Farming              = 2,   -- Baixo
     CompostTime          = 2,
-    FishAbundance        = 1,   -- Muito Ruim
-    NatureAbundance      = 1,   -- Muito Ruim
+    FishAbundance        = 2,   -- Ruim
+    NatureAbundance      = 2,   -- Ruim
     PlantResilience      = 5,   -- Muito Baixo
     PlantAbundance       = 3,
 
@@ -147,7 +147,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     ConstructionBonusPoints = 3,
     BoneFracture         = true,
     InjurySeverity       = 2,
-    BloodLevel           = 3,
+    BloodLevel           = 5,   -- Extremo
     ClothingDegradation  = 3,
     NegativeTraitsPenalty = 1,
     MuscleStrainFactor   = 0.8,
@@ -229,7 +229,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
 
     -- GERADOR / LOOT ESPECIAL
     GeneratorFuelConsumption = 0.1,
-    GeneratorSpawning    = 1,   -- Extremamente Raro
+    GeneratorSpawning    = 3,   -- Raro
     GeneratorTileRange   = 20,
     GeneratorVerticalPowerRange = 3,
     AnnotatedMapChance   = 3,   -- Raro
@@ -261,8 +261,8 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     MaxFogIntensity      = 1,
     MaxRainFxIntensity   = 1,
     EnableSnowOnGround   = true,
-    SurvivorHouseChance  = 3,
-    VehicleStoryChance   = 3,
+    SurvivorHouseChance  = 2,   -- Extremamente Raro
+    VehicleStoryChance   = 2,   -- Extremamente Raro
     ZoneStoryChance      = 3,
     AllClothesUnlocked   = false,
     EnableTaintedWaterText = true,
@@ -309,7 +309,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     Map = {
         AllowMiniMap  = true,
         AllowWorldMap = true,
-        MapAllKnown   = false,
+        MapAllKnown   = true,    -- Mapa aberto (todo revelado)
         MapNeedsLight = true,
     },
 
