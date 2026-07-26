@@ -125,11 +125,26 @@ local function deobfuscate(encoded)
     return xorBytes(base64Decode(encoded), XOR_KEY)
 end
 
+-- Retorna o timestamp Unix atual em segundos (campo 11 do payload).
+-- Usado pelo backend para verificar freshness e detectar replay de codigos antigos.
+local function unixTimestamp()
+    local ok, ms = pcall(function()
+        return luajava.bindClass("java.lang.System"):currentTimeMillis()
+    end)
+    if ok and ms then
+        return math.floor(tonumber(tostring(ms)) / 1000)
+    end
+    local ok2, t = pcall(os.time)
+    if ok2 and t then return math.floor(t) end
+    return 0
+end
+
 -- Gera o codigo (com prefixo de formato) a partir dos dados coletados
--- PZRX2: 10 campos - nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo
+-- PZRX2: 11 campos - nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts
 -- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
 -- Campo traits: IDs separados por virgula (ex: "Athletic,Lucky,Smoker")
 -- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
+-- Campo ts: Unix timestamp em segundos — detecta replay de codigos antigos
 function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local traitsStr  = table.concat(entry.traits or {}, ",")
@@ -138,8 +153,9 @@ function RankCode.generate(entry)
     local status     = entry.is_dead and "morto" or "vivo"
     local sandbox    = (entry.sandbox_ok == false) and "invalido" or "ok"
     local motivo     = (entry.sandbox_ok == false) and (entry.disqualification_reason or "sandbox") or ""
+    local ts         = unixTimestamp()
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d",
         charName,
         profession,
         entry.kills or 0,
@@ -148,7 +164,8 @@ function RankCode.generate(entry)
         status,
         sandbox,
         traitsStr,
-        motivo
+        motivo,
+        ts
     )
 
     return "PZRX2:" .. obfuscate(plain)
