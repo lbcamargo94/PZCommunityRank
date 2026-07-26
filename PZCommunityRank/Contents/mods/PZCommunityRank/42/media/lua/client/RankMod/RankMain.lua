@@ -48,6 +48,10 @@ local PERIODIC_TICKS = 18000
 local _killsSinceSync = 0
 local KILLS_PER_SYNC  = 5    -- dispara sync a cada 5 kills
 
+-- Gap de horas in-game sem o mod ativo que aciona ModViolation.
+-- Threshold generoso (1h) para cobrir crashes/reinicializacoes sem falso positivo.
+local GAP_HOURS_THRESHOLD = 1.0
+
 -- Verifica todos os valores do preset completo. Se houver divergencias:
 --   1. Ativa _sandboxViolationDetected (permanente na sessao).
 --   2. Persiste PZCommunityRank_SandboxViolation no ModData do jogador.
@@ -94,6 +98,8 @@ local function checkClearViolationFile(player)
         md["PZCommunityRank_SandboxViolation"] = nil
         md["PZCommunityRank_DebugViolation"]   = nil
         md["PZCommunityRank_ModViolation"]     = nil
+        -- Reseta o timestamp de horas para que o gap nao dispare novamente na proxima carga
+        md["PZCommunityRank_LastSyncHours"]    = player:getHoursSurvived()
     end)
     _sandboxViolationDetected = false
     _debugViolationDetected   = false
@@ -262,6 +268,14 @@ local function silentUpdate(player, playerIndex)
 
     RankFile.save(entry, code)
     pcall(function() RankSandboxExport.export(entry.character_name) end)
+
+    -- Registra hora atual para detectar gap de jogo sem o mod na proxima sessao
+    if _isChallengeGame then
+        pcall(function()
+            player:getModData()["PZCommunityRank_LastSyncHours"] = player:getHoursSurvived()
+        end)
+    end
+
     RankLog.info("silentUpdate: arquivo sincronizado - " .. (entry.character_name or "?"))
 end
 
@@ -383,8 +397,28 @@ local function onGameStart()
                 end
             end)
 
+            -- Detecta gap de horas jogadas sem o mod ativo (bypass via desativacao do mod).
+            -- Deve rodar ANTES de checkClearViolationFile para que o clear do moderador
+            -- possa resetar o gap (LastSyncHours) e evitar re-flag na proxima carga.
+            pcall(function()
+                local p2 = getPlayer()
+                if not p2 then return end
+                local md = p2:getModData()
+                local lastKnownHours = md["PZCommunityRank_LastSyncHours"]
+                if not lastKnownHours then return end
+                local currentHours = p2:getHoursSurvived()
+                local gap = currentHours - lastKnownHours
+                if gap > GAP_HOURS_THRESHOLD then
+                    _modViolationDetected = true
+                    md["PZCommunityRank_ModViolation"] = true
+                    RankLog.warn(string.format(
+                        "OnGameStart: %.1fh sem mod detectado (last=%.2f atual=%.2f) - DESCLASSIFICADO.",
+                        gap, lastKnownHours, currentHours))
+                end
+            end)
+
             -- Verifica se o Companion sinalizou limpeza de violacao.
-            -- Deve rodar APOS restaurar flags do ModData para poder sobrescreve-las.
+            -- Deve rodar APOS o gap check para poder sobrescrever flags e resetar LastSyncHours.
             pcall(function()
                 local p2 = getPlayer()
                 if p2 then checkClearViolationFile(p2) end
