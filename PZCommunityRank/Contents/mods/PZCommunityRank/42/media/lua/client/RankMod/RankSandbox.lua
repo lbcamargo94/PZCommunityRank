@@ -109,16 +109,36 @@ local RULES = {
     { key = "NatureAbundance",expected = 2, label = "Natureza (Ruim=2)" },
 
     -- [ AMBIENTE ]
-    { key = "MetaEvent",  expected = 1, label = "Eventos Aleatorios (Nunca=1)" },
+    { key = "MetaEvent",  expected = 1,    label = "Eventos Aleatorios (Nunca=1)" },
+    { key = "FireSpread", expected = true, label = "Fogo se Espalha (Ativado)" },
+
+    -- [ EVENTOS ]
+    { key = "Helicopter",   expected = 2, label = "Helicoptero (Algumas Vezes=2)" },
+    { key = "LockedHouses", expected = 6, label = "Casas Trancadas (Muito Freq.=6)" },
+    { key = "CarAlarm",     expected = 6, label = "Alarme Carros (Muito Freq.=6)" },
 
     -- [ PERSONAGEM ]
-    { key = "MultiplierConfig.Global", expected = 0.8, label = "Mult. XP Global (0.8)", tol = 0.05 },
+    { key = "MultiplierConfig.Global", expected = 0.8,   label = "Mult. XP Global (0.8)",         tol = 0.05 },
+    { key = "StarterKit",              expected = false,  label = "Kit Inicial (Desabilitado)" },
+    { key = "CharacterFreePoints",     expected = 0,      label = "Pontos Livres (0)" },
+    { key = "MultiHitZombies",         expected = false,  label = "Multi-Hit Zumbis (Desabilitado)" },
+    { key = "EasyClimbing",            expected = false,  label = "Escalar Facil (Desabilitado)" },
+    { key = "BoneFracture",            expected = true,   label = "Fraturas Osseas (Ativado)" },
+    { key = "AttackBlockMovements",    expected = true,   label = "Bloqueio p/ Ataque (Ativado)" },
+
+    -- [ ZUMBIS - Comportamento (complemento) ]
+    { key = "ZombieLore.Transmission", expected = 1, label = "Transmissao (Sangue=1)" },
 
     -- [ VEICULOS ]
-    { key = "ChanceHasGas",        expected = 1, label = "Gasolina (Baixo=1)" },
-    { key = "InitialGas",          expected = 1, label = "Gasolina Inicial (M.Baixo=1)" },
-    { key = "LockedCar",           expected = 6, label = "Veiculos Trancados (M.Freq.=6)" },
-    { key = "CarGeneralCondition", expected = 1, label = "Cond. Veiculos (M.Baixo=1)" },
+    { key = "ChanceHasGas",            expected = 1,     label = "Gasolina (Baixo=1)" },
+    { key = "InitialGas",              expected = 1,     label = "Gasolina Inicial (M.Baixo=1)" },
+    { key = "LockedCar",               expected = 6,     label = "Veiculos Trancados (M.Freq.=6)" },
+    { key = "CarGeneralCondition",     expected = 1,     label = "Cond. Veiculos (M.Baixo=1)" },
+    { key = "FuelStationGasInfinite",  expected = false, label = "Gasolina Infinita (Desabilitado)" },
+    { key = "VehicleEasyUse",          expected = false, label = "Veiculos Faceis (Desabilitado)" },
+
+    -- [ MAPA ]
+    { key = "Map.MapAllKnown", expected = true, label = "Mapa Aberto (Obrigatorio)" },
 
     -- [ ANIMAIS ]
     { key = "AnimalRanchChance", expected = 2, label = "Animais (Ext.Raro=2)" },
