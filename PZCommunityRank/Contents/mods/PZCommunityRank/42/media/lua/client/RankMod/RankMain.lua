@@ -37,6 +37,10 @@ local _debugViolationDetected = false
 -- Persiste via ModData (PZCommunityRank_ModViolation).
 local _modViolationDetected = false
 
+-- Lista de violacoes de mod da sessao atual (ex: {"NAO_PERMITIDO:SomeMod","AUSENTE:Other"}).
+-- Disponivel apenas na sessao em que a violacao foi detectada (nao persiste).
+local _modViolationList = {}
+
 -- Ultimo codigo gerado pelo silentUpdate - evita salvar arquivos sem mudanca de estado.
 local _lastSilentCode = nil
 
@@ -104,6 +108,7 @@ local function checkClearViolationFile(player)
     _sandboxViolationDetected = false
     _debugViolationDetected   = false
     _modViolationDetected     = false
+    _modViolationList         = {}
 
     pcall(function()
         local w = getFileWriter("pz_rank/pz_rank_clear_violation.txt", false, false)
@@ -155,6 +160,7 @@ local function checkModViolation(player)
     if #violations == 0  then return true end  -- sem violacoes
 
     _modViolationDetected = true
+    _modViolationList     = violations
     RankLog.warn(string.format("DESCLASSIFICADO: %d mod(s) nao permitido(s) detectado(s).", #violations))
     for _, v in ipairs(violations) do RankLog.warn("  -> " .. v) end
 
@@ -164,6 +170,18 @@ local function checkModViolation(player)
         end
     end)
     return false
+end
+
+-- Retorna a string de motivo de desclassificacao por mod, incluindo a lista de IDs.
+-- Formato: "mods:NAO_PERMITIDO:id1,AUSENTE:id2" (maximo 10 entradas para nao inflar o codigo).
+-- Retorna "mods" se a lista nao estiver disponivel (violacao restaurada via ModData).
+local function buildModReason()
+    if #_modViolationList == 0 then return "mods" end
+    local cap = {}
+    for i = 1, math.min(10, #_modViolationList) do
+        cap[i] = _modViolationList[i]
+    end
+    return "mods:" .. table.concat(cap, ",")
 end
 
 -- Coleta dados, gera codigo, salva arquivo e abre a UI de resultado.
@@ -206,7 +224,7 @@ local function triggerRank(player, playerIndex, isDead)
     if anyViolation then
         -- Prioridade: mods > debug > sandbox
         if _modViolationDetected then
-            entry.disqualification_reason = "mods"
+            entry.disqualification_reason = buildModReason()
         elseif _debugViolationDetected then
             entry.disqualification_reason = "debug"
         else
@@ -249,7 +267,7 @@ local function silentUpdate(player, playerIndex)
     entry.sandbox_ok = not anyViolation
     if anyViolation then
         if _modViolationDetected then
-            entry.disqualification_reason = "mods"
+            entry.disqualification_reason = buildModReason()
         elseif _debugViolationDetected then
             entry.disqualification_reason = "debug"
         else
