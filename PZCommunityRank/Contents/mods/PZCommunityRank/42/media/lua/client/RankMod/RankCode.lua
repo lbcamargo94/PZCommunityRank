@@ -128,11 +128,15 @@ end
 -- Retorna o timestamp Unix atual em segundos (campo 11 do payload).
 -- Usado pelo backend para verificar freshness e detectar replay de codigos antigos.
 local function unixTimestamp()
-    local ok, ms = pcall(function()
-        return luajava.bindClass("java.lang.System"):currentTimeMillis()
-    end)
-    if ok and ms then
-        return math.floor(tonumber(tostring(ms)) / 1000)
+    -- luajava pode ser null no Kahlua VM em certos contextos; indexar null lanca
+    -- RuntimeException Java que o pcall Lua nao captura — guarda aqui, fora do pcall.
+    if luajava then
+        local ok, ms = pcall(function()
+            return luajava.bindClass("java.lang.System"):currentTimeMillis()
+        end)
+        if ok and ms then
+            return math.floor(tonumber(tostring(ms)) / 1000)
+        end
     end
     local ok2, t = pcall(os.time)
     if ok2 and t then return math.floor(t) end
