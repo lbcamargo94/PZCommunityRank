@@ -10,6 +10,8 @@
 --
 --  Prefixo "PZRX2:" (v1.4+, 9 campos). Prefixo "PZRX1:" era o
 --  formato legado com 6 campos (sem status, sandbox ou traits).
+--  Campo 12 (modver): versao do mod, ex: "2.5.3". Usado pelo backend para
+--  bloquear syncs de versoes desatualizadas sem desclassificar o jogador.
 --  O site (src/app.ts) deve checar o prefixo para saber o formato.
 --
 --  IMPORTANTE: isto e OFUSCACAO, nao criptografia forte - o mod e
@@ -25,6 +27,7 @@ require "RankMod/RankLog"
 
 RankCode = {}
 
+local MOD_VERSION = "2.5.3"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -159,7 +162,7 @@ function RankCode.generate(entry)
     local motivo     = (entry.sandbox_ok == false) and (entry.disqualification_reason or "sandbox") or ""
     local ts         = unixTimestamp()
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s",
         charName,
         profession,
         entry.kills or 0,
@@ -169,7 +172,8 @@ function RankCode.generate(entry)
         sandbox,
         traitsStr,
         motivo,
-        ts
+        ts,
+        MOD_VERSION
     )
 
     return "PZRX2:" .. obfuscate(plain)
