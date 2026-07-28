@@ -218,14 +218,10 @@ local function triggerRank(player, playerIndex, isDead)
             RankLog.warn("triggerRank: sandbox invalido - codigo sera marcado como 'invalido'.")
         end
     end
-    -- Mod viola prioridade maxima, independente de sandbox/debug
-    local anyViolation = not sandboxOk or _modViolationDetected
+    local anyViolation = not sandboxOk
     entry.sandbox_ok = not anyViolation
     if anyViolation then
-        -- Prioridade: mods > debug > sandbox
-        if _modViolationDetected then
-            entry.disqualification_reason = buildModReason()
-        elseif _debugViolationDetected then
+        if _debugViolationDetected then
             entry.disqualification_reason = "debug"
         else
             entry.disqualification_reason = "sandbox"
@@ -263,12 +259,10 @@ local function silentUpdate(player, playerIndex)
     else
         pcall(function() sandboxOk = (RankSandbox.check(false) == true) end)
     end
-    local anyViolation = not sandboxOk or _modViolationDetected
+    local anyViolation = not sandboxOk
     entry.sandbox_ok = not anyViolation
     if anyViolation then
-        if _modViolationDetected then
-            entry.disqualification_reason = buildModReason()
-        elseif _debugViolationDetected then
+        if _debugViolationDetected then
             entry.disqualification_reason = "debug"
         else
             entry.disqualification_reason = "sandbox"
@@ -622,4 +616,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.19+ | v2.5.6")
+RankLog.info("Mod carregado - B42.19+ | v2.5.7")
