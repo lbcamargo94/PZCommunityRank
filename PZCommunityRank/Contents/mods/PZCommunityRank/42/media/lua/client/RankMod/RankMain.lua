@@ -236,6 +236,7 @@ local function triggerRank(player, playerIndex, isDead)
     end
 
     RankFile.save(entry, code)
+    pcall(function() RankFile.saveHeatmap(player, entry.character_name) end)
     -- Exporta sandbox em arquivo separado - independente do PZRX2
     pcall(function() RankSandboxExport.export(entry.character_name) end)
     RankSubmitUI.open(entry, code, playerIndex)
@@ -279,6 +280,7 @@ local function silentUpdate(player, playerIndex)
     _lastSilentCode = code
 
     RankFile.save(entry, code)
+    pcall(function() RankFile.saveHeatmap(player, entry.character_name) end)
     pcall(function() RankSandboxExport.export(entry.character_name) end)
 
     -- Registra hora atual para detectar gap de jogo sem o mod na proxima sessao
@@ -320,6 +322,9 @@ local function onPlayerDeath(player, playerIndex)
 
     RankLog.info("OnPlayerDeath: jogador local morreu, index=" .. playerIndex)
     RankMain.submitted[playerIndex] = false
+
+    -- Registra posição de morte para heatmap antes da tela de morte
+    pcall(recordHeatmapDeath, player)
 
     -- Aguarda ~60 ticks para a tela de morte renderizar antes de abrir a UI.
     -- Events.OnPreUI foi removido no B42.19; usa OnTick como fallback.
@@ -485,6 +490,57 @@ end
 Events.OnPlayerDeath.Add(onPlayerDeath)
 Events.OnGameStart.Add(onGameStart)
 Events.OnFillWorldObjectContextMenu.Add(onFillWorldContextMenu)
+
+-- ── Heatmap — acumula eventos por célula de grid ────────────────────────────
+-- Célula = coordenada // 100 (cada célula cobre 100×100 blocos do jogo).
+-- Os acumuladores ficam no ModData e são lidos pelo RankFile antes de enviar.
+
+-- Obtém a célula de grid do jogador local (retorna nil se indisponível).
+local function getPlayerGridCell(player)
+    local xOk, x = pcall(function() return player:getX() end)
+    local yOk, y = pcall(function() return player:getY() end)
+    if not xOk or not yOk or not x or not y then return nil end
+    return math.floor(x / 100), math.floor(y / 100)
+end
+
+-- Incrementa o contador de kills na célula do jogador.
+local function incHeatmapKill(player)
+    if not player then return end
+    local gx, gy = getPlayerGridCell(player)
+    if not gx then return end
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+    local key = "PZCommunityRank_HeatKill_" .. gx .. "_" .. gy
+    md[key] = (tonumber(md[key]) or 0) + 1
+    -- Mantém índice de células para iteração no RankFile (mesmo padrão do LootedBldSet)
+    local cellTag = "|" .. gx .. "_" .. gy .. "|"
+    local cells   = md["PZCommunityRank_HeatKillCells"] or ""
+    if not cells:find(cellTag, 1, true) then
+        md["PZCommunityRank_HeatKillCells"] = cells .. cellTag
+    end
+end
+
+-- Registra a posição de morte do jogador.
+local function recordHeatmapDeath(player)
+    if not player then return end
+    local gx, gy = getPlayerGridCell(player)
+    if not gx then return end
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+    md["PZCommunityRank_HeatDeathGX"] = gx
+    md["PZCommunityRank_HeatDeathGY"] = gy
+end
+
+-- Registra a posição atual como base (chamado no silentUpdate periódico).
+local function recordHeatmapBase(player)
+    if not player then return end
+    local gx, gy = getPlayerGridCell(player)
+    if not gx then return end
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+    md["PZCommunityRank_HeatBaseGX"] = gx
+    md["PZCommunityRank_HeatBaseGY"] = gy
+end
 
 -- ── Contadores PZRX3 — estatísticas estendidas ──────────────────────────────
 -- Cada listener incrementa um contador no ModData do jogador local.
@@ -664,6 +720,13 @@ pcall(function()
     Events.OnZombieDead.Add(function(zombie)
         if _isStartingUp then return end
         _killsSinceSync = _killsSinceSync + 1
+
+        -- Acumula kill na célula de grid do jogador (heatmap)
+        local ok2, player2 = pcall(getPlayer)
+        if ok2 and player2 and isLocalPlayer(player2) then
+            pcall(incHeatmapKill, player2)
+        end
+
         if _killsSinceSync < KILLS_PER_SYNC then return end
         _killsSinceSync = 0
         RankLog.info("OnZombieDead: " .. KILLS_PER_SYNC .. " kills - disparando sync")
@@ -725,6 +788,9 @@ Events.OnTick.Add(function()
     -- Atualiza pico de horas sem dormir a cada ciclo periódico
     pcall(updateHoursWithoutSleep)
 
+    -- Registra posição atual como base (usada no heatmap)
+    pcall(recordHeatmapBase, player)
+
     safeSilentUpdate(player, 0)
 end)
 
@@ -752,4 +818,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.7.0")
+RankLog.info("Mod carregado - B42.20 | v2.8.0")

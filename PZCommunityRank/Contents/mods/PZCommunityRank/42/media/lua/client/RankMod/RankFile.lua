@@ -83,3 +83,62 @@ function RankFile.save(entry, code)
     end
     return ok
 end
+
+-- Exporta delta de heatmap para pz_rank_heatmap_<charname>.json.
+-- Lido pelo Companion e enviado como heatmap_delta no POST de sync.
+function RankFile.saveHeatmap(player, charName)
+    if not player or not charName then return end
+    local safeName = sanitizeName(charName)
+    local md
+    local mdOk = pcall(function() md = player:getModData() end)
+    if not mdOk or not md then return end
+
+    local parts = {}
+
+    -- Coleta kills por célula a partir do índice PZCommunityRank_HeatKillCells
+    local cellsStr = md["PZCommunityRank_HeatKillCells"] or ""
+    for cell in cellsStr:gmatch("|([^|]+)|") do
+        local gxStr, gyStr = cell:match("^(-?%d+)_(-?%d+)$")
+        if gxStr and gyStr then
+            local count = tonumber(md["PZCommunityRank_HeatKill_" .. gxStr .. "_" .. gyStr]) or 0
+            if count > 0 then
+                parts[#parts + 1] = string.format(
+                    '{"type":"kill","gx":%s,"gy":%s,"count":%d}', gxStr, gyStr, count)
+            end
+        end
+    end
+
+    -- Posição de morte (se registrada)
+    local dGX = tonumber(md["PZCommunityRank_HeatDeathGX"])
+    local dGY = tonumber(md["PZCommunityRank_HeatDeathGY"])
+    if dGX and dGY then
+        parts[#parts + 1] = string.format(
+            '{"type":"death","gx":%d,"gy":%d,"count":1}', dGX, dGY)
+    end
+
+    -- Posição de base (se registrada)
+    local bGX = tonumber(md["PZCommunityRank_HeatBaseGX"])
+    local bGY = tonumber(md["PZCommunityRank_HeatBaseGY"])
+    if bGX and bGY then
+        parts[#parts + 1] = string.format(
+            '{"type":"base","gx":%d,"gy":%d,"count":1}', bGX, bGY)
+    end
+
+    if #parts == 0 then return end
+
+    local json     = "[" .. table.concat(parts, ",") .. "]"
+    local filePath = "pz_rank/pz_rank_heatmap_" .. safeName .. ".json"
+
+    local ok2, err2 = pcall(function()
+        local w = getFileWriter(filePath, true, false)
+        if not w then error("getFileWriter retornou nil") end
+        w:write(json)
+        w:close()
+    end)
+
+    if ok2 then
+        RankLog.info("Heatmap salvo: " .. filePath .. " (" .. #parts .. " pontos)")
+    else
+        RankLog.error("Falha ao salvar heatmap " .. filePath .. ": " .. tostring(err2))
+    end
+end
