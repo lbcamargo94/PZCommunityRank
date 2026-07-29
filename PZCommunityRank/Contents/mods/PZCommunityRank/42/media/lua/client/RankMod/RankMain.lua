@@ -616,4 +616,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.19+ | v2.5.7")
+RankLog.info("Mod carregado - B42.20 | v2.6.0")

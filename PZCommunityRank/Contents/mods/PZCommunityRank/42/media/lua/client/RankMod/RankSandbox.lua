@@ -5,7 +5,7 @@
 --  Abre um ISPanel de alerta quando algo diverge.
 --  Nao bloqueia o jogo - apenas avisa.
 --
---  Enums reais do B42.19 (extraidos do preset "Brasileirao PZ.cfg"):
+--  Enums reais do B42.19-20 (extraidos do preset "Brasileirao PZ.cfg"):
 --
 --  ZombieLore.Speed:        1=Corredores  2=Normal  3=Lento  4=Aleatorio
 --  ZombieLore.Strength:     1=Super-humano  2=Normal  3=Fraco  4=Aleatorio
@@ -127,7 +127,19 @@ local RULES = {
     { key = "AttackBlockMovements",    expected = true,   label = "Bloqueio p/ Ataque (Ativado)" },
 
     -- [ ZUMBIS - Comportamento (complemento) ]
-    { key = "ZombieLore.Transmission", expected = 1, label = "Transmissao (Sangue=1)" },
+    { key = "ZombieLore.Transmission",              expected = 1,   label = "Transmissao (Sangue=1)" },
+
+    -- [ ZUMBIS - Dificuldade B42.20 ]
+    { key = "ZombieLore.ZombiesArmorFactor",        expected = 2.0, label = "Armadura Zumbi (2.0)",         tol = 0.05 },
+    { key = "ZombieLore.ChanceOfAttachedWeapon",    expected = 10,  label = "Chance Arma no Zumbi (10)" },
+    { key = "ZombieLore.FenceDamageMultiplier",     expected = 1.3, label = "Dano em Cercas (1.3)",         tol = 0.05 },
+    { key = "ZombieLore.ZombiesFallDamage",         expected = 1.0, label = "Dano de Queda Zumbi (1.0)",   tol = 0.05 },
+
+    -- [ LOOT - Efeito Populacao B42.20 ]
+    { key = "ZombiePopLootEffect",                  expected = 5,   label = "Efeito Pop. no Loot (5)" },
+
+    -- [ ARMAS DE FOGO - Dificuldade B42.20 ]
+    { key = "FirearmNoiseMultiplier",               expected = 1.3, label = "Ruido Armas de Fogo (1.3)",    tol = 0.05 },
 
     -- [ VEICULOS ]
     { key = "ChanceHasGas",            expected = 1,     label = "Gasolina (Baixo=1)" },
