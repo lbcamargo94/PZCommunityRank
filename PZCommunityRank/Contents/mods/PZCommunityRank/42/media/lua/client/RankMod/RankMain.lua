@@ -486,6 +486,139 @@ Events.OnPlayerDeath.Add(onPlayerDeath)
 Events.OnGameStart.Add(onGameStart)
 Events.OnFillWorldObjectContextMenu.Add(onFillWorldContextMenu)
 
+-- ── Contadores PZRX3 — estatísticas estendidas ──────────────────────────────
+-- Cada listener incrementa um contador no ModData do jogador local.
+-- Todos os eventos sao registrados via pcall: se o evento nao existir nesta
+-- versao do PZ, o pcall falha silenciosamente e o contador fica em 0.
+
+-- Incrementa um contador inteiro no ModData do jogador local.
+local function incModCounter(key)
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+    md[key] = (tonumber(md[key]) or 0) + 1
+end
+
+-- Animais abatidos
+pcall(function()
+    Events.OnAnimalDead.Add(function(animal)
+        local ok, player = pcall(getPlayer)
+        if not ok or not player then return end
+        -- Confirma que foi o jogador local que matou (lastAttacker pode ser nil)
+        local attackerOk, attacker = pcall(function() return animal:getAttackedBy() end)
+        if attackerOk and attacker and attacker ~= player then return end
+        incModCounter("PZCommunityRank_AnimalsKilled")
+    end)
+end)
+
+-- Peixes capturados
+pcall(function()
+    Events.OnPlayerFishCaught.Add(function(player)
+        if not isLocalPlayer(player) then return end
+        incModCounter("PZCommunityRank_FishCaught")
+    end)
+end)
+
+-- Vegetais colhidos (B42 usa OnPlantHarvested ou OnFarmPlantHarvested)
+pcall(function()
+    Events.OnPlantHarvested.Add(function(plant, player)
+        if not player or not isLocalPlayer(player) then return end
+        incModCounter("PZCommunityRank_CropsHarvested")
+    end)
+end)
+pcall(function()
+    Events.OnFarmPlantHarvested.Add(function(player)
+        if not player or not isLocalPlayer(player) then return end
+        incModCounter("PZCommunityRank_CropsHarvested")
+    end)
+end)
+
+-- Itens fabricados (craft/receita completada)
+pcall(function()
+    Events.OnCraftRecipeCompleted.Add(function(recipe, result, player)
+        if not player or not isLocalPlayer(player) then return end
+        incModCounter("PZCommunityRank_ItemsCrafted")
+    end)
+end)
+pcall(function()
+    Events.OnCraftResult.Add(function(player, recipe, items)
+        if not player or not isLocalPlayer(player) then return end
+        incModCounter("PZCommunityRank_ItemsCrafted")
+    end)
+end)
+
+-- Casas saqueadas: conta prédios únicos onde o jogador abriu um container.
+-- Usa um set de IDs de building em ModData para evitar contar o mesmo prédio duas vezes.
+pcall(function()
+    Events.OnContainerUpdate.Add(function(container)
+        local ok, player = pcall(getPlayer)
+        if not ok or not player then return end
+        -- Obtém o building ID do container (via IsoObject pai)
+        local bldOk, bldId = pcall(function()
+            local sq = container:getParent() and container:getParent():getSquare()
+            if not sq then return nil end
+            local bld = sq:getBuilding()
+            return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
+        end)
+        if not bldOk or not bldId then return end
+        local mdOk, md = pcall(function() return player:getModData() end)
+        if not mdOk or not md then return end
+        local setKey = "PZCommunityRank_LootedBldSet"
+        local setStr = md[setKey] or ""
+        local tag = "|" .. bldId .. "|"
+        if setStr:find(tag, 1, true) then return end
+        -- Novo prédio — registra e incrementa
+        md[setKey] = setStr .. tag
+        md["PZCommunityRank_HousesLooted"] = (tonumber(md["PZCommunityRank_HousesLooted"]) or 0) + 1
+    end)
+end)
+
+-- Horas sem dormir (pico): atualizado a cada tick periódico e ao adormecer.
+-- Ao acordar, o pico NÃO é resetado — queremos o recorde acumulado da run.
+local function updateHoursWithoutSleep()
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
+    -- Tenta API direta
+    local apiOk, apiVal = pcall(function()
+        return player:getStats() and player:getStats():getHoursWithoutSleep()
+    end)
+    local current = (apiOk and type(apiVal) == "number") and math.floor(apiVal) or nil
+    if not current or current <= 0 then
+        -- Fallback: deriva a partir de HoursSurvived - LastSleepHours
+        local mdOk, md = pcall(function() return player:getModData() end)
+        if mdOk and md and md["PZCommunityRank_LastSleepHours"] then
+            local hoursOk, hours = pcall(function() return player:getHoursSurvived() end)
+            if hoursOk and hours then
+                current = math.max(0, math.floor(hours - (md["PZCommunityRank_LastSleepHours"] or hours)))
+            end
+        end
+    end
+    if not current or current <= 0 then return end
+    local mdOk2, md2 = pcall(function() return player:getModData() end)
+    if not mdOk2 or not md2 then return end
+    local prev = tonumber(md2["PZCommunityRank_HoursWithoutSleep"]) or 0
+    if current > prev then
+        md2["PZCommunityRank_HoursWithoutSleep"] = current
+    end
+end
+
+-- Registra o horário de última sonecada para o cálculo de fallback
+pcall(function()
+    Events.OnPlayerStartSleeping.Add(function(player)
+        if not isLocalPlayer(player) then return end
+        -- Guarda o pico antes de dormir
+        updateHoursWithoutSleep()
+        -- Marca o horário do último sono (para calcular horas awake depois)
+        local ok, md = pcall(function() return player:getModData() end)
+        if not ok or not md then return end
+        local hOk, hours = pcall(function() return player:getHoursSurvived() end)
+        if hOk and hours then
+            md["PZCommunityRank_LastSleepHours"] = hours
+        end
+    end)
+end)
+
 if Events.OnTryTalkInChat then
     Events.OnTryTalkInChat.Add(onChatCommand)
 else
@@ -589,6 +722,9 @@ Events.OnTick.Add(function()
         RankLog.info("Periodic: ~5 min - disparando sync")
     end
 
+    -- Atualiza pico de horas sem dormir a cada ciclo periódico
+    pcall(updateHoursWithoutSleep)
+
     safeSilentUpdate(player, 0)
 end)
 
@@ -616,4 +752,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.6.0")
+RankLog.info("Mod carregado - B42.20 | v2.7.0")

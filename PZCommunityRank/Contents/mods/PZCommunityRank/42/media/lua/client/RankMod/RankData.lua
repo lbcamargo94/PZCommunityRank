@@ -169,6 +169,53 @@ local function resolveIsDead(player, isDead)
     return false
 end
 
+-- Coleta as estatísticas estendidas do PZRX3.
+-- Para stats sem API direta no Kahlua, lê contadores acumulados no ModData
+-- (incrementados por listeners de evento registrados no RankMain.lua).
+-- Retorna 0 em vez de nil para que o format string nunca gere campo vazio.
+function RankData.collectExtended(player)
+    local result = {
+        animals_killed      = 0,
+        fish_caught         = 0,
+        crops_harvested     = 0,
+        items_crafted       = 0,
+        houses_looted       = 0,
+        hours_without_sleep = 0,
+    }
+
+    -- Tentativa de API direta para animais abatidos (B42 pode expor via IsoPlayer)
+    local ok, val
+    ok, val = pcall(function() return player:getAnimalKills() end)
+    if ok and type(val) == "number" and val > 0 then
+        result.animals_killed = math.floor(val)
+    end
+
+    -- Lê contadores de ModData (incrementados pelos event listeners)
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if mdOk and md then
+        local function readInt(key)
+            return math.floor(tonumber(md[key]) or 0)
+        end
+        -- animals_killed: toma o maior entre API direta e ModData
+        local mdAnimals = readInt("PZCommunityRank_AnimalsKilled")
+        if mdAnimals > result.animals_killed then
+            result.animals_killed = mdAnimals
+        end
+        result.fish_caught         = readInt("PZCommunityRank_FishCaught")
+        result.crops_harvested     = readInt("PZCommunityRank_CropsHarvested")
+        result.items_crafted       = readInt("PZCommunityRank_ItemsCrafted")
+        result.houses_looted       = readInt("PZCommunityRank_HousesLooted")
+        result.hours_without_sleep = readInt("PZCommunityRank_HoursWithoutSleep")
+    end
+
+    RankLog.info(string.format(
+        "collectExtended: animals=%d fish=%d crops=%d crafted=%d houses=%d nosleep=%d",
+        result.animals_killed, result.fish_caught, result.crops_harvested,
+        result.items_crafted, result.houses_looted, result.hours_without_sleep))
+
+    return result
+end
+
 -- isDead: true = chamado por morte, false/nil = trigger manual (jogador vivo)
 function RankData.collect(player, isDead)
     if not player then
@@ -207,6 +254,8 @@ function RankData.collect(player, isDead)
     local profession = getProfessionName(player)
     local traits = collectTraits(player)
 
+    local extended = RankData.collectExtended(player)
+
     RankLog.info(string.format(
         "Dados coletados: kills=%d, tempo_min=%d, skills=%d, max=%d, morto=%s, prof=%s, traits=%d",
         kills, timeRaw, #skillsRaw, maxSkills, tostring(dead), profession, #traits))
@@ -222,5 +271,6 @@ function RankData.collect(player, isDead)
         max_skills      = maxSkills,
         is_dead         = dead,
         traits          = traits,
+        extended        = extended,
     }
 end
