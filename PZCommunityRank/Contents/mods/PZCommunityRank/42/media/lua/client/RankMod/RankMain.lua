@@ -558,7 +558,9 @@ end
 
 -- Animais abatidos
 pcall(function()
-    Events.OnAnimalDead.Add(function(animal)
+    local ev = Events.OnAnimalDead
+    if type(ev) ~= "table" then return end
+    ev.Add(function(animal)
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         -- Confirma que foi o jogador local que matou (lastAttacker pode ser nil)
@@ -570,7 +572,9 @@ end)
 
 -- Peixes capturados
 pcall(function()
-    Events.OnPlayerFishCaught.Add(function(player)
+    local ev = Events.OnPlayerFishCaught
+    if type(ev) ~= "table" then return end
+    ev.Add(function(player)
         if not isLocalPlayer(player) then return end
         incModCounter("PZCommunityRank_FishCaught")
     end)
@@ -578,13 +582,17 @@ end)
 
 -- Vegetais colhidos (B42 usa OnPlantHarvested ou OnFarmPlantHarvested)
 pcall(function()
-    Events.OnPlantHarvested.Add(function(plant, player)
+    local ev = Events.OnPlantHarvested
+    if type(ev) ~= "table" then return end
+    ev.Add(function(plant, player)
         if not player or not isLocalPlayer(player) then return end
         incModCounter("PZCommunityRank_CropsHarvested")
     end)
 end)
 pcall(function()
-    Events.OnFarmPlantHarvested.Add(function(player)
+    local ev = Events.OnFarmPlantHarvested
+    if type(ev) ~= "table" then return end
+    ev.Add(function(player)
         if not player or not isLocalPlayer(player) then return end
         incModCounter("PZCommunityRank_CropsHarvested")
     end)
@@ -592,13 +600,17 @@ end)
 
 -- Itens fabricados (craft/receita completada)
 pcall(function()
-    Events.OnCraftRecipeCompleted.Add(function(recipe, result, player)
+    local ev = Events.OnCraftRecipeCompleted
+    if type(ev) ~= "table" then return end
+    ev.Add(function(recipe, result, player)
         if not player or not isLocalPlayer(player) then return end
         incModCounter("PZCommunityRank_ItemsCrafted")
     end)
 end)
 pcall(function()
-    Events.OnCraftResult.Add(function(player, recipe, items)
+    local ev = Events.OnCraftResult
+    if type(ev) ~= "table" then return end
+    ev.Add(function(player, recipe, items)
         if not player or not isLocalPlayer(player) then return end
         incModCounter("PZCommunityRank_ItemsCrafted")
     end)
@@ -661,7 +673,9 @@ end
 
 -- Registra o horário de última sonecada para o cálculo de fallback
 pcall(function()
-    Events.OnPlayerStartSleeping.Add(function(player)
+    local ev = Events.OnPlayerStartSleeping
+    if type(ev) ~= "table" then return end
+    ev.Add(function(player)
         if not isLocalPlayer(player) then return end
         -- Guarda o pico antes de dormir
         updateHoursWithoutSleep()
