@@ -8,24 +8,24 @@
 --  e mantidos em sincronia com RankSandbox.lua.
 -- ============================================================
 BRASILEIRAO_CHALLENGE_PRESET = {
-    Version = 6,
+    Version = 7,
 
     -- ZUMBIS - Populacao
     ZombieConfig = {
         PopulationMultiplier      = 4.0,
-        PopulationStartMultiplier = 2.0,
-        PopulationPeakMultiplier  = 2.0,
+        PopulationStartMultiplier = 2.5,
+        PopulationPeakMultiplier  = 2.5,
         PopulationPeakDay         = 1,
         RespawnHours              = 0.0,   -- Nenhum respawn
         RespawnUnseenHours        = 0.0,
         RespawnMultiplier         = 0.0,
         RedistributeHours         = 24.0,
-        FollowSoundDistance       = 300,
-        RallyGroupSize            = 1,
-        RallyGroupSizeVariance    = 5,
-        RallyTravelDistance       = 10,
+        FollowSoundDistance       = 600,
+        RallyGroupSize            = 0,
+        RallyGroupSizeVariance    = 50,
+        RallyTravelDistance       = 20,
         RallyGroupSeparation      = 15,
-        RallyGroupRadius          = 6,
+        RallyGroupRadius          = 3,
         ZombiesCountBeforeDelete  = 300,
     },
 
@@ -35,7 +35,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
         SprinterPercentage       = 0,   -- Nenhum corredor
         Strength                 = 1,   -- Super-humano
         Toughness                = 2,   -- Normal
-        Transmission             = 1,
+        Transmission             = 2,   -- Apenas Saliva
         Mortality                = 5,
         Reanimate                = 1,   -- Instantaneo
         Cognition                = 1,   -- Avancado (abre portas)
@@ -54,12 +54,12 @@ BRASILEIRAO_CHALLENGE_PRESET = {
         ZombiesFenceLunge        = true,
         ZombiesArmorFactor       = 2.0,
         ZombiesMaxDefense        = 90,
-        ChanceOfAttachedWeapon   = 10,
+        ChanceOfAttachedWeapon   = 6,
         ZombiesFallDamage        = 1.0,
         DisableFakeDead          = 2,   -- Total (incl. mortos pelo jogador)
         PlayerSpawnZombieRemoval = 4,
         FenceThumpersRequired    = 25,
-        FenceDamageMultiplier    = 1.3,
+        FenceDamageMultiplier    = 2.0,
     },
 
     -- LOOT - todas as categorias em 0.04 (Muito Baixo)
@@ -87,7 +87,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     RollsMultiplier      = 1.0,
     RemoveStoryLoot      = false,
     RemoveZombieLoot     = false,
-    ZombiePopLootEffect  = 5,
+    ZombiePopLootEffect  = 2,
     InsaneLootFactor     = 0.05,
     ExtremeLootFactor    = 0.2,
     RareLootFactor       = 0.6,
@@ -117,7 +117,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     AlarmDecayModifier   = 14,  -- Baterias morrem 14 dias apos inicio
 
     -- TEMPO / NATUREZA
-    Temperature          = 2,   -- Frio
+    Temperature          = 1,   -- Muito Frio
     Rain                 = 2,   -- Seco
     NightDarkness        = 3,   -- Normal
     NightLength          = 3,
@@ -241,7 +241,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     AnimalAgeModifier        = 4,
     AnimalMilkIncModifier    = 4,
     AnimalWoolIncModifier    = 4,
-    AnimalRanchChance        = 2,   -- Extremamente Raro
+    AnimalRanchChance        = 3,   -- Raro
     AnimalGrassRegrowTime    = 240,
     AnimalMetaPredator       = false,
     AnimalMatingSeason       = true,
@@ -299,7 +299,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
 
     -- ARMAS DE FOGO
     FirearmUseDamageChance   = 2,
-    FirearmNoiseMultiplier   = 1.3,
+    FirearmNoiseMultiplier   = 2.0,
     FirearmJamMultiplier     = 1.0,
     FirearmMoodleMultiplier  = 1.0,
     FirearmWeatherMultiplier = 1.0,

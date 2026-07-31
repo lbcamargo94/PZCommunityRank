@@ -45,8 +45,8 @@ RankSandbox = {}
 local RULES = {
     -- [ ZUMBIS - Populacao ]
     { key = "ZombieConfig.PopulationMultiplier",       expected = 4.0, label = "Pop. Multiplicador",         tol = 0.05 },
-    { key = "ZombieConfig.PopulationStartMultiplier",  expected = 2.0, label = "Pop. Inicial",                tol = 0.05 },
-    { key = "ZombieConfig.PopulationPeakMultiplier",   expected = 2.0, label = "Pop. Pico",                   tol = 0.05 },
+    { key = "ZombieConfig.PopulationStartMultiplier",  expected = 2.5, label = "Pop. Inicial",                tol = 0.05 },
+    { key = "ZombieConfig.PopulationPeakMultiplier",   expected = 2.5, label = "Pop. Pico",                   tol = 0.05 },
     { key = "ZombieConfig.PopulationPeakDay",          expected = 1,   label = "Dia do Pico" },
 
     -- [ ZUMBIS - Comportamento ]
@@ -59,14 +59,14 @@ local RULES = {
     { key = "ZombieLore.Sight",                        expected = 1,    label = "Visao (Aguia=1)" },
     { key = "ZombieLore.Memory",                       expected = 1,    label = "Memoria (Longa=1)" },
     { key = "ZombieLore.Cognition",                    expected = 1,    label = "Percepcao/Portas (Avancado=1)" },
-    { key = "ZombieConfig.FollowSoundDistance",        expected = 300,  label = "Raio de Audicao (300)" },
+    { key = "ZombieConfig.FollowSoundDistance",        expected = 600,  label = "Raio de Audicao (600)" },
     { key = "ZombieConfig.RespawnHours",               expected = 0.0,  label = "Respawn (Nenhum=0)",              tol = 0.01 },
     { key = "ZombieConfig.RedistributeHours",          expected = 24.0, label = "Migracao de Zumbis (24h)",         tol = 0.5  },
-    { key = "ZombieConfig.RallyGroupSize",             expected = 1,    label = "Tamanho da Horda (1)" },
-    { key = "ZombieConfig.RallyGroupSizeVariance",     expected = 5,    label = "Variancia Horda (5)" },
-    { key = "ZombieConfig.RallyTravelDistance",        expected = 10,   label = "Distancia Rally (10)" },
+    { key = "ZombieConfig.RallyGroupSize",             expected = 0,    label = "Tamanho da Horda (0)" },
+    { key = "ZombieConfig.RallyGroupSizeVariance",     expected = 50,   label = "Variancia Horda (50)" },
+    { key = "ZombieConfig.RallyTravelDistance",        expected = 20,   label = "Distancia Rally (20)" },
     { key = "ZombieConfig.RallyGroupSeparation",       expected = 15,   label = "Separacao de Horda (15)" },
-    { key = "ZombieConfig.RallyGroupRadius",           expected = 6,    label = "Raio de Horda (6)" },
+    { key = "ZombieConfig.RallyGroupRadius",           expected = 3,    label = "Raio de Horda (3)" },
     { key = "ZombieLore.DisableFakeDead",              expected = 2,    label = "Fake Dead Total (2)" },
     { key = "ZombieLore.ZombiesCrawlersDragDown",      expected = true, label = "Rastejadores Derrubam" },
 
@@ -103,7 +103,7 @@ local RULES = {
 
     -- [ NATUREZA ]
     { key = "NightDarkness",  expected = 3, label = "Escuridao Noite (Normal=3)" },
-    { key = "Temperature",    expected = 2, label = "Temperatura (Frio=2)" },
+    { key = "Temperature",    expected = 1, label = "Temperatura (Muito Frio=1)" },
     { key = "Rain",           expected = 2, label = "Chuva (Seco=2)" },
     { key = "FishAbundance",  expected = 2, label = "Pesca (Ruim=2)" },
     { key = "NatureAbundance",expected = 2, label = "Natureza (Ruim=2)" },
@@ -127,19 +127,19 @@ local RULES = {
     { key = "AttackBlockMovements",    expected = true,   label = "Bloqueio p/ Ataque (Ativado)" },
 
     -- [ ZUMBIS - Comportamento (complemento) ]
-    { key = "ZombieLore.Transmission",              expected = 1,   label = "Transmissao (Sangue=1)" },
+    { key = "ZombieLore.Transmission",              expected = 2,   label = "Transmissao (Saliva=2)" },
 
     -- [ ZUMBIS - Dificuldade B42.20 ]
     { key = "ZombieLore.ZombiesArmorFactor",        expected = 2.0, label = "Armadura Zumbi (2.0)",         tol = 0.05 },
-    { key = "ZombieLore.ChanceOfAttachedWeapon",    expected = 10,  label = "Chance Arma no Zumbi (10)" },
-    { key = "ZombieLore.FenceDamageMultiplier",     expected = 1.3, label = "Dano em Cercas (1.3)",         tol = 0.05 },
+    { key = "ZombieLore.ChanceOfAttachedWeapon",    expected = 6,   label = "Chance Arma no Zumbi (6)" },
+    { key = "ZombieLore.FenceDamageMultiplier",     expected = 2.0, label = "Dano em Cercas (2.0)",         tol = 0.05 },
     { key = "ZombieLore.ZombiesFallDamage",         expected = 1.0, label = "Dano de Queda Zumbi (1.0)",   tol = 0.05 },
 
     -- [ LOOT - Efeito Populacao B42.20 ]
-    { key = "ZombiePopLootEffect",                  expected = 5,   label = "Efeito Pop. no Loot (5)" },
+    { key = "ZombiePopLootEffect",                  expected = 2,   label = "Efeito Pop. no Loot (2)" },
 
     -- [ ARMAS DE FOGO - Dificuldade B42.20 ]
-    { key = "FirearmNoiseMultiplier",               expected = 1.3, label = "Ruido Armas de Fogo (1.3)",    tol = 0.05 },
+    { key = "FirearmNoiseMultiplier",               expected = 2.0, label = "Ruido Armas de Fogo (2.0)",    tol = 0.05 },
 
     -- [ VEICULOS ]
     { key = "ChanceHasGas",            expected = 1,     label = "Gasolina (Baixo=1)" },
@@ -153,7 +153,7 @@ local RULES = {
     { key = "Map.MapAllKnown", expected = true, label = "Mapa Aberto (Obrigatorio)" },
 
     -- [ ANIMAIS ]
-    { key = "AnimalRanchChance", expected = 2, label = "Animais (Ext.Raro=2)" },
+    { key = "AnimalRanchChance", expected = 3, label = "Animais (Raro=3)" },
 }
 
 -- -- Leitura de sub-tabelas via path com pontos -----------------------------
