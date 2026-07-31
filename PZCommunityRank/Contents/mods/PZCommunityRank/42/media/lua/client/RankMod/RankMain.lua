@@ -664,9 +664,35 @@ addFirstAvailableEvent({ "OnAnimalDead" }, function(animal)
 end, "Animais abatidos")
 
 -- Peixes capturados
-addFirstAvailableEvent({ "OnPlayerFishCaught", "OnFishCaught" }, function(player)
+local function recordFishCaught(player)
     if not isLocalPlayer(player) then return end
     incModCounter("PZCommunityRank_FishCaught")
+    RankLog.info("Peixe capturado contabilizado.")
+end
+
+-- B42.20 conclui a pesca por ISPickupFishAction e nao expoe evento publico.
+-- self.isFish distingue peixe verdadeiro de lixo retirado da agua.
+pcall(function()
+    require "TimedActions/Fishing/TimedActions/ISPickupFishAction"
+    if ISPickupFishAction and ISPickupFishAction.complete
+            and not ISPickupFishAction._pzRankPatched then
+        local originalComplete = ISPickupFishAction.complete
+        ISPickupFishAction.complete = function(self)
+            local completed = originalComplete(self)
+            if completed and self and self.isFish and not self._pzRankFishCounted then
+                self._pzRankFishCounted = true
+                recordFishCaught(self.character)
+            end
+            return completed
+        end
+        ISPickupFishAction._pzRankPatched = true
+        RankLog.info("Peixes capturados: fallback B42 instalado.")
+    end
+end)
+
+-- Mantém compatibilidade com builds futuras que voltem a expor o evento.
+addFirstAvailableEvent({ "OnPlayerFishCaught", "OnFishCaught" }, function(player)
+    recordFishCaught(player)
 end, "Peixes capturados")
 
 -- Vegetais colhidos (B42 usa OnPlantHarvested ou OnFarmPlantHarvested)
@@ -897,4 +923,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.8.2")
+RankLog.info("Mod carregado - B42.20 | v2.8.3")
