@@ -84,7 +84,7 @@ function RankFile.save(entry, code)
     return ok
 end
 
--- Exporta delta de heatmap para pz_rank_heatmap_<charname>.json.
+-- Exporta delta de heatmap para pz_rank_heatmap_<charname>.log.
 -- Lido pelo Companion e enviado como heatmap_delta no POST de sync.
 function RankFile.saveHeatmap(player, charName)
     if not player or not charName then return end
@@ -127,18 +127,23 @@ function RankFile.saveHeatmap(player, charName)
     if #parts == 0 then return end
 
     local json     = "[" .. table.concat(parts, ",") .. "]"
-    local filePath = "pz_rank/pz_rank_heatmap_" .. safeName .. ".json"
+    -- B42.20 bloqueia .json no getFileWriter; o conteudo permanece JSON.
+    local filePath = "pz_rank/pz_rank_heatmap_" .. safeName .. ".log"
 
+    local written = false
     local ok2, err2 = pcall(function()
         local w = getFileWriter(filePath, true, false)
-        if not w then error("getFileWriter retornou nil") end
+        if not w then return end
         w:write(json)
         w:close()
+        written = true
     end)
 
-    if ok2 then
+    if ok2 and written then
         RankLog.info("Heatmap salvo: " .. filePath .. " (" .. #parts .. " pontos)")
-    else
+    elseif not ok2 then
         RankLog.error("Falha ao salvar heatmap " .. filePath .. ": " .. tostring(err2))
+    else
+        RankLog.warn("Heatmap: getFileWriter recusou o arquivo .log.")
     end
 end

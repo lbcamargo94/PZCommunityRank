@@ -183,24 +183,14 @@ function RankData.collectExtended(player)
         hours_without_sleep = 0,
     }
 
-    -- Tentativa de API direta para animais abatidos (B42 pode expor via IsoPlayer)
-    local ok, val
-    ok, val = pcall(function() return player:getAnimalKills() end)
-    if ok and type(val) == "number" and val > 0 then
-        result.animals_killed = math.floor(val)
-    end
-
     -- Lê contadores de ModData (incrementados pelos event listeners)
     local mdOk, md = pcall(function() return player:getModData() end)
     if mdOk and md then
         local function readInt(key)
             return math.floor(tonumber(md[key]) or 0)
         end
-        -- animals_killed: toma o maior entre API direta e ModData
-        local mdAnimals = readInt("PZCommunityRank_AnimalsKilled")
-        if mdAnimals > result.animals_killed then
-            result.animals_killed = mdAnimals
-        end
+        -- B42.20 nao expoe IsoPlayer:getAnimalKills() ao Lua.
+        result.animals_killed      = readInt("PZCommunityRank_AnimalsKilled")
         result.fish_caught         = readInt("PZCommunityRank_FishCaught")
         result.crops_harvested     = readInt("PZCommunityRank_CropsHarvested")
         result.items_crafted       = readInt("PZCommunityRank_ItemsCrafted")

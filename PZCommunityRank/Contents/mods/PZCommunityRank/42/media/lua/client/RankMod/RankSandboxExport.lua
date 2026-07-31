@@ -4,7 +4,7 @@
 --  Gera um arquivo JSON com TODAS as opcoes do SandboxVars ativo,
 --  sem filtros, para auditoria pelos moderadores no painel web.
 --
---  Arquivo gerado: <Zomboid>/Lua/pz_rank/pz_rank_sandbox_<Personagem>.json
+--  Arquivo gerado: <Zomboid>/Lua/pz_rank/pz_rank_sandbox_<Personagem>.log
 --  Formato separado do PZRX2 - nao interfere no fluxo de ranking.
 -- ============================================================
 
@@ -206,9 +206,12 @@ end
 -- Retorna true em sucesso, false em falha.
 
 function RankSandboxExport.export(charName)
+    local exported = false
     local ok, err = pcall(function()
         local name      = sanitizeName(charName or 'Sobrevivente')
-        local filePath  = 'pz_rank/pz_rank_sandbox_' .. name .. '.json'
+        -- B42.20 bloqueia a extensao .json no getFileWriter. O conteudo
+        -- continua sendo JSON; .log e apenas o transporte permitido pelo jogo.
+        local filePath  = 'pz_rank/pz_rank_sandbox_' .. name .. '.log'
         local sandboxData = captureSandbox()
 
         local payload = {
@@ -222,15 +225,24 @@ function RankSandboxExport.export(charName)
         local json = encodeVal(payload)
 
         local w = getFileWriter(filePath, true, false)  -- overwrite (nao acumular)
-        if not w then error('getFileWriter retornou nil') end
+        -- Na B42.20, overwrite pode retornar nil enquanto o arquivo ainda nao
+        -- existe dentro de um subdiretorio. Cria o arquivo na primeira escrita;
+        -- as exportacoes seguintes usam overwrite normalmente.
+        if not w then
+            w = getFileWriter(filePath, true, true)
+        end
+        if not w then return end
         w:write(json)
         w:close()
+        exported = true
 
         RankLog.info('RankSandboxExport: exportado -> ' .. filePath)
     end)
 
     if not ok then
         RankLog.error('RankSandboxExport.export falhou: ' .. tostring(err))
+    elseif not exported then
+        RankLog.warn('RankSandboxExport: getFileWriter recusou o arquivo .log.')
     end
-    return ok
+    return ok and exported
 end

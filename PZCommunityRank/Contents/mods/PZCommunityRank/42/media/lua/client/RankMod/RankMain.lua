@@ -544,8 +544,38 @@ end
 
 -- ── Contadores PZRX3 — estatísticas estendidas ──────────────────────────────
 -- Cada listener incrementa um contador no ModData do jogador local.
--- Todos os eventos sao registrados via pcall: se o evento nao existir nesta
--- versao do PZ, o pcall falha silenciosamente e o contador fica em 0.
+-- Eventos opcionais mudam entre builds do PZ. Acessar `.Add` em um evento
+-- inexistente gera "attempted index: Add of non-table: null" mesmo dentro de
+-- pcall, portanto validamos o objeto de evento antes de registrar o listener.
+
+local function addOptionalEvent(eventName, callback)
+    local event = Events and Events[eventName]
+    if not event then
+        return false
+    end
+
+    local ok, err = pcall(function()
+        event.Add(callback)
+    end)
+    if not ok then
+        RankLog.warn("Falha ao registrar " .. eventName .. ": " .. tostring(err))
+        return false
+    end
+    return true
+end
+
+-- Registra somente o primeiro alias existente. Algumas builds expõem mais de
+-- um nome para a mesma ação; registrar todos faria o contador subir em dobro.
+local function addFirstAvailableEvent(eventNames, callback, featureName)
+    for _, eventName in ipairs(eventNames) do
+        if addOptionalEvent(eventName, callback) then
+            RankLog.info(featureName .. ": usando evento " .. eventName .. ".")
+            return true
+        end
+    end
+    RankLog.warn(featureName .. ": nenhum evento compativel nesta build; usando apenas APIs/fallbacks disponiveis.")
+    return false
+end
 
 -- Incrementa um contador inteiro no ModData do jogador local.
 local function incModCounter(key)
@@ -556,75 +586,120 @@ local function incModCounter(key)
     md[key] = (tonumber(md[key]) or 0) + 1
 end
 
--- Animais abatidos
+-- Animais abatidos -----------------------------------------------------------
+-- B42.20 nao expoe OnAnimalDead. Rastreia animais atingidos pelo jogador ate
+-- morrerem (inclusive os que fogem sangrando) e integra o abate manual.
+local _trackedAnimals = {}
+local _countedAnimals = {}
+local ANIMAL_TRACK_TICKS = 18000 -- abandona referencias antigas apos ~5 min
+
+local function recordAnimalKill(animal)
+    if not animal or _countedAnimals[animal] then return end
+    _countedAnimals[animal] = true
+    incModCounter("PZCommunityRank_AnimalsKilled")
+    RankLog.info("Animal abatido contabilizado.")
+end
+
+local function trackAnimalHit(owner, weapon, hitObject)
+    if not owner or not isLocalPlayer(owner) then return end
+    if not hitObject or not instanceof(hitObject, "IsoAnimal") then return end
+    if _countedAnimals[hitObject] then return end
+
+    for _, tracked in ipairs(_trackedAnimals) do
+        if tracked.animal == hitObject then
+            tracked.ticks = 0
+            return
+        end
+    end
+    _trackedAnimals[#_trackedAnimals + 1] = { animal = hitObject, ticks = 0 }
+end
+
+local function updateTrackedAnimalDeaths()
+    for i = #_trackedAnimals, 1, -1 do
+        local tracked = _trackedAnimals[i]
+        local animal = tracked.animal
+        tracked.ticks = tracked.ticks + 1
+
+        -- IsoAnimal:isDead() e isExistInTheWorld() sao APIs usadas pelos
+        -- scripts vanilla B42. Se sumiu logo apos ser atingido, virou cadáver.
+        if animal:isDead() or not animal:isExistInTheWorld() then
+            recordAnimalKill(animal)
+            table.remove(_trackedAnimals, i)
+        elseif tracked.ticks >= ANIMAL_TRACK_TICKS then
+            table.remove(_trackedAnimals, i)
+        end
+    end
+end
+
+addOptionalEvent("OnWeaponHitXp", trackAnimalHit)
+addOptionalEvent("OnTick", updateTrackedAnimalDeaths)
+
+-- Abate pela ação contextual (animais domésticos/presos).
 pcall(function()
-    local ev = Events.OnAnimalDead
-    if type(ev) ~= "table" then return end
-    ev.Add(function(animal)
-        local ok, player = pcall(getPlayer)
-        if not ok or not player then return end
-        -- Confirma que foi o jogador local que matou (lastAttacker pode ser nil)
-        local attackerOk, attacker = pcall(function() return animal:getAttackedBy() end)
-        if attackerOk and attacker and attacker ~= player then return end
-        incModCounter("PZCommunityRank_AnimalsKilled")
-    end)
+    require "TimedActions/Animals/ISKillAnimal"
+    if ISKillAnimal and ISKillAnimal.complete and not ISKillAnimal._pzRankPatched then
+        local originalComplete = ISKillAnimal.complete
+        ISKillAnimal.complete = function(self)
+            local animal = self and self.animal
+            local character = self and self.character
+            local completed = originalComplete(self)
+            if completed and character and isLocalPlayer(character) and animal then
+                recordAnimalKill(animal)
+            end
+            return completed
+        end
+        ISKillAnimal._pzRankPatched = true
+        RankLog.info("Animais abatidos: fallback B42 instalado.")
+    end
 end)
+
+-- Mantém compatibilidade caso uma build futura volte a expor OnAnimalDead.
+addFirstAvailableEvent({ "OnAnimalDead" }, function(animal)
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
+    -- Confirma que foi o jogador local que matou (lastAttacker pode ser nil)
+    local attackerOk, attacker = pcall(function() return animal:getAttackedBy() end)
+    if attackerOk and attacker and attacker ~= player then return end
+    recordAnimalKill(animal)
+end, "Animais abatidos")
 
 -- Peixes capturados
-pcall(function()
-    local ev = Events.OnPlayerFishCaught
-    if type(ev) ~= "table" then return end
-    ev.Add(function(player)
-        if not isLocalPlayer(player) then return end
-        incModCounter("PZCommunityRank_FishCaught")
-    end)
-end)
+addFirstAvailableEvent({ "OnPlayerFishCaught", "OnFishCaught" }, function(player)
+    if not isLocalPlayer(player) then return end
+    incModCounter("PZCommunityRank_FishCaught")
+end, "Peixes capturados")
 
 -- Vegetais colhidos (B42 usa OnPlantHarvested ou OnFarmPlantHarvested)
-pcall(function()
-    local ev = Events.OnPlantHarvested
-    if type(ev) ~= "table" then return end
-    ev.Add(function(plant, player)
-        if not player or not isLocalPlayer(player) then return end
-        incModCounter("PZCommunityRank_CropsHarvested")
-    end)
-end)
-pcall(function()
-    local ev = Events.OnFarmPlantHarvested
-    if type(ev) ~= "table" then return end
-    ev.Add(function(player)
-        if not player or not isLocalPlayer(player) then return end
-        incModCounter("PZCommunityRank_CropsHarvested")
-    end)
-end)
+addFirstAvailableEvent({ "OnPlantHarvested", "OnFarmPlantHarvested" }, function(first, second)
+    local player = second or first
+    if not player or not isLocalPlayer(player) then return end
+    incModCounter("PZCommunityRank_CropsHarvested")
+end, "Vegetais colhidos")
 
 -- Itens fabricados (craft/receita completada)
-pcall(function()
-    local ev = Events.OnCraftRecipeCompleted
-    if type(ev) ~= "table" then return end
-    ev.Add(function(recipe, result, player)
-        if not player or not isLocalPlayer(player) then return end
-        incModCounter("PZCommunityRank_ItemsCrafted")
-    end)
-end)
-pcall(function()
-    local ev = Events.OnCraftResult
-    if type(ev) ~= "table" then return end
-    ev.Add(function(player, recipe, items)
-        if not player or not isLocalPlayer(player) then return end
-        incModCounter("PZCommunityRank_ItemsCrafted")
-    end)
-end)
+addFirstAvailableEvent({ "OnCraftRecipeCompleted", "OnCraftResult" }, function(first, second, third)
+    -- As assinaturas variam por build: procura o jogador em qualquer argumento.
+    local candidates = { first, second, third }
+    for _, candidate in ipairs(candidates) do
+        if candidate and isLocalPlayer(candidate) then
+            incModCounter("PZCommunityRank_ItemsCrafted")
+            return
+        end
+    end
+end, "Itens fabricados")
 
 -- Casas saqueadas: conta prédios únicos onde o jogador abriu um container.
 -- Usa um set de IDs de building em ModData para evitar contar o mesmo prédio duas vezes.
-pcall(function()
-    Events.OnContainerUpdate.Add(function(container)
+addOptionalEvent("OnContainerUpdate", function(container)
+        -- B42.20 tambem dispara OnContainerUpdate sem argumento ao atualizar
+        -- portas e outros objetos do mundo.
+        if not container or not instanceof(container, "ItemContainer") then return end
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         -- Obtém o building ID do container (via IsoObject pai)
         local bldOk, bldId = pcall(function()
-            local sq = container:getParent() and container:getParent():getSquare()
+            local parent = container:getParent()
+            local sq = parent and parent:getSquare()
             if not sq then return nil end
             local bld = sq:getBuilding()
             return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
@@ -639,7 +714,6 @@ pcall(function()
         -- Novo prédio — registra e incrementa
         md[setKey] = setStr .. tag
         md["PZCommunityRank_HousesLooted"] = (tonumber(md["PZCommunityRank_HousesLooted"]) or 0) + 1
-    end)
 end)
 
 -- Horas sem dormir (pico): atualizado a cada tick periódico e ao adormecer.
@@ -647,19 +721,14 @@ end)
 local function updateHoursWithoutSleep()
     local ok, player = pcall(getPlayer)
     if not ok or not player then return end
-    -- Tenta API direta
-    local apiOk, apiVal = pcall(function()
-        return player:getStats() and player:getStats():getHoursWithoutSleep()
-    end)
-    local current = (apiOk and type(apiVal) == "number") and math.floor(apiVal) or nil
-    if not current or current <= 0 then
-        -- Fallback: deriva a partir de HoursSurvived - LastSleepHours
-        local mdOk, md = pcall(function() return player:getModData() end)
-        if mdOk and md and md["PZCommunityRank_LastSleepHours"] then
-            local hoursOk, hours = pcall(function() return player:getHoursSurvived() end)
-            if hoursOk and hours then
-                current = math.max(0, math.floor(hours - (md["PZCommunityRank_LastSleepHours"] or hours)))
-            end
+    -- B42.20 nao expoe Stats:getHoursWithoutSleep() ao Lua. Deriva o valor
+    -- usando o horario registrado pelo evento de sono quando ele existir.
+    local current = nil
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if mdOk and md and md["PZCommunityRank_LastSleepHours"] then
+        local hoursOk, hours = pcall(function() return player:getHoursSurvived() end)
+        if hoursOk and hours then
+            current = math.max(0, math.floor(hours - (md["PZCommunityRank_LastSleepHours"] or hours)))
         end
     end
     if not current or current <= 0 then return end
@@ -672,22 +741,18 @@ local function updateHoursWithoutSleep()
 end
 
 -- Registra o horário de última sonecada para o cálculo de fallback
-pcall(function()
-    local ev = Events.OnPlayerStartSleeping
-    if type(ev) ~= "table" then return end
-    ev.Add(function(player)
-        if not isLocalPlayer(player) then return end
-        -- Guarda o pico antes de dormir
-        updateHoursWithoutSleep()
-        -- Marca o horário do último sono (para calcular horas awake depois)
-        local ok, md = pcall(function() return player:getModData() end)
-        if not ok or not md then return end
-        local hOk, hours = pcall(function() return player:getHoursSurvived() end)
-        if hOk and hours then
-            md["PZCommunityRank_LastSleepHours"] = hours
-        end
-    end)
-end)
+addFirstAvailableEvent({ "OnPlayerStartSleeping", "OnPlayerSleep" }, function(player)
+    if not isLocalPlayer(player) then return end
+    -- Guarda o pico antes de dormir
+    updateHoursWithoutSleep()
+    -- Marca o horário do último sono (para calcular horas awake depois)
+    local ok, md = pcall(function() return player:getModData() end)
+    if not ok or not md then return end
+    local hOk, hours = pcall(function() return player:getHoursSurvived() end)
+    if hOk and hours then
+        md["PZCommunityRank_LastSleepHours"] = hours
+    end
+end, "Inicio do sono")
 
 if Events.OnTryTalkInChat then
     Events.OnTryTalkInChat.Add(onChatCommand)
