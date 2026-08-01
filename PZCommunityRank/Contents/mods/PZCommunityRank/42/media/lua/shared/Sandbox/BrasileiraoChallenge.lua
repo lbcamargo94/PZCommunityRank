@@ -117,7 +117,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     AlarmDecayModifier   = 14,  -- Baterias morrem 14 dias apos inicio
 
     -- TEMPO / NATUREZA
-    Temperature          = 1,   -- Muito Frio
+    Temperature          = 2,   -- Frio
     Rain                 = 2,   -- Seco
     NightDarkness        = 3,   -- Normal
     NightLength          = 3,
@@ -316,6 +316,11 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     -- PORAO
     Basement = {
         SpawnFrequency = 6,
+    },
+
+    -- MODS OPCIONAIS (aplicados, nao monitorados)
+    TWF_Resting = {
+        AllowStatusHUD = true,
     },
 }
 return BRASILEIRAO_CHALLENGE_PRESET
