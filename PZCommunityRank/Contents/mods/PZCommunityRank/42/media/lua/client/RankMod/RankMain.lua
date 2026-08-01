@@ -780,6 +780,135 @@ addFirstAvailableEvent({ "OnPlayerStartSleeping", "OnPlayerSleep" }, function(pl
     end
 end, "Inicio do sono")
 
+-- Restaurantes Spiffo visitados — detecta pelo tipo de room (spiffo_dining / spiffoskitchen)
+-- Usa set de building IDs no ModData para contar cada restaurante uma unica vez.
+local SPIFFO_ROOMS = { spiffo_dining = true, spiffoskitchen = true }
+
+local function checkSpiffoVisit()
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
+    local sqOk, sq = pcall(function() return player:getCurrentSquare() end)
+    if not sqOk or not sq then return end
+    local roomOk, room = pcall(function() return sq:getRoom() end)
+    if not roomOk or not room then return end
+    local nameOk, roomName = pcall(function() return room:getName() end)
+    if not nameOk or not roomName then return end
+    if not SPIFFO_ROOMS[roomName:lower()] then return end
+
+    local bldOk, bldId = pcall(function()
+        local bld = sq:getBuilding()
+        return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
+    end)
+    if not bldOk or not bldId then return end
+
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+    local setKey = "PZCommunityRank_SpiffoSet"
+    local setStr = md[setKey] or ""
+    local tag = "|" .. bldId .. "|"
+    if setStr:find(tag, 1, true) then return end
+
+    md[setKey] = setStr .. tag
+    md["PZCommunityRank_SpiffoVisited"] = (tonumber(md["PZCommunityRank_SpiffoVisited"]) or 0) + 1
+    RankLog.info("Spiffo visitado! bldId=" .. bldId .. " total=" .. md["PZCommunityRank_SpiffoVisited"])
+end
+
+-- Árvores cortadas — patch primario; evento so registrado se nao existir o patch
+local _chopTreePatched = false
+pcall(function()
+    require "TimedActions/ISChopTreeAction"
+    if ISChopTreeAction and ISChopTreeAction.perform and not ISChopTreeAction._pzRankPatched then
+        local orig = ISChopTreeAction.perform
+        ISChopTreeAction.perform = function(self)
+            local result = orig(self)
+            if self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_TreesCut")
+            end
+            return result
+        end
+        ISChopTreeAction._pzRankPatched = true
+        _chopTreePatched = true
+        RankLog.info("Arvores cortadas: patch instalado.")
+    end
+end)
+if not _chopTreePatched then
+    addOptionalEvent("OnChopTree", function(player)
+        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_TreesCut") end
+    end)
+end
+
+-- Livros lidos — patch primario; evento so registrado se nao existir o patch
+local _readBookPatched = false
+pcall(function()
+    require "TimedActions/ISReadABook"
+    if ISReadABook and ISReadABook.perform and not ISReadABook._pzRankPatched then
+        local orig = ISReadABook.perform
+        ISReadABook.perform = function(self)
+            local result = orig(self)
+            if self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_BooksRead")
+            end
+            return result
+        end
+        ISReadABook._pzRankPatched = true
+        _readBookPatched = true
+        RankLog.info("Livros lidos: patch instalado.")
+    end
+end)
+if not _readBookPatched then
+    addOptionalEvent("OnReadBook", function(player)
+        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_BooksRead") end
+    end)
+end
+
+-- Estruturas construídas — patch primario; evento so registrado se nao existir o patch
+local _buildPatched = false
+pcall(function()
+    require "BuildingObjects/TimedActions/ISBuildAction"
+    if ISBuildAction and ISBuildAction.perform and not ISBuildAction._pzRankPatched then
+        local orig = ISBuildAction.perform
+        ISBuildAction.perform = function(self)
+            local result = orig(self)
+            if self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_StructuresBuilt")
+            end
+            return result
+        end
+        ISBuildAction._pzRankPatched = true
+        _buildPatched = true
+        RankLog.info("Estruturas construidas: patch instalado.")
+    end
+end)
+if not _buildPatched then
+    addFirstAvailableEvent({ "OnBuildComplete", "OnBuildAction" }, function(player)
+        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_StructuresBuilt") end
+    end, "Estruturas construidas (evento)")
+end
+
+-- Culturas plantadas — patch primario; evento so registrado se nao existir o patch
+local _seedPatched = false
+pcall(function()
+    require "Farming/TimedActions/ISSeedActionNew"
+    if ISSeedActionNew and ISSeedActionNew.perform and not ISSeedActionNew._pzRankPatched then
+        local orig = ISSeedActionNew.perform
+        ISSeedActionNew.perform = function(self)
+            local result = orig(self)
+            if self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_CropsPlanted")
+            end
+            return result
+        end
+        ISSeedActionNew._pzRankPatched = true
+        _seedPatched = true
+        RankLog.info("Culturas plantadas: patch instalado.")
+    end
+end)
+if not _seedPatched then
+    addFirstAvailableEvent({ "OnPlantSeeds", "OnPlant" }, function(player)
+        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_CropsPlanted") end
+    end, "Culturas plantadas (evento)")
+end
+
 if Events.OnTryTalkInChat then
     Events.OnTryTalkInChat.Add(onChatCommand)
 else
@@ -864,7 +993,19 @@ end)
 -- Para jogos de desafio: verifica o sandbox e aplica correcoes se necessario,
 -- depois sincroniza o arquivo. Garante que alteracoes externas (outros mods,
 -- configuracoes manuais) sejam revertidas automaticamente.
+local _spiffoCheckTick = 0
+local SPIFFO_CHECK_TICKS = 300  -- ~5 segundos a 60fps
+
 Events.OnTick.Add(function()
+    -- Verificacao rapida de visita a Spiffo (a cada ~5s, independente do ciclo principal)
+    _spiffoCheckTick = _spiffoCheckTick + 1
+    if _spiffoCheckTick >= SPIFFO_CHECK_TICKS then
+        _spiffoCheckTick = 0
+        if not _isStartingUp then
+            pcall(checkSpiffoVisit)
+        end
+    end
+
     _periodicTick = _periodicTick + 1
     if _periodicTick < PERIODIC_TICKS then return end
     _periodicTick = 0
@@ -923,4 +1064,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.8.3")
+RankLog.info("Mod carregado - B42.20 | v2.11.0")

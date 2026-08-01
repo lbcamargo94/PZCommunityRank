@@ -1,20 +1,24 @@
 -- ============================================================
 --  RankCode.lua - Gerador do codigo de submissao
 --
---  Formato PZRX3 (v2.7+, 17 campos):
+--  Formato PZRX5 (v2.11+, 22 campos):
 --  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|
 --      <traits>|<motivo>|<ts>|<modver>|
 --      <animals_killed>|<fish_caught>|<crops_harvested>|
---      <items_crafted>|<houses_looted>|<hours_without_sleep>
+--      <items_crafted>|<houses_looted>|<hours_without_sleep>|
+--      <trees_cut>|<books_read>|<structures_built>|<crops_planted>|
+--      <spiffo_visited>
 --
 --  <status>:  "morto" ou "vivo"
 --  <sandbox>: "ok" ou "invalido"
 --  <traits>:  IDs separados por virgula (ex: "Athletic,Lucky,Smoker"); pode ser vazio
---  Campos 13-18: inteiros; 0 se nao disponivel nesta versao do PZ
+--  Campos 13-22: inteiros; 0 se nao disponivel nesta versao do PZ
 --
 --  Formatos legados aceitos pelo backend (retrocompat.):
 --    PZRX1: 6 campos (sem status/sandbox/traits)
 --    PZRX2: 11 campos (sem extended stats)
+--    PZRX3: 17 campos
+--    PZRX4: 21 campos
 --
 --  IMPORTANTE: isto e OFUSCACAO, nao criptografia forte - o mod e
 --  Lua aberto (Workshop) e o site e JS aberto no navegador, entao
@@ -29,7 +33,7 @@ require "RankMod/RankLog"
 
 RankCode = {}
 
-local MOD_VERSION = "2.9.1"
+local MOD_VERSION = "2.11.0"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -149,10 +153,11 @@ local function unixTimestamp()
 end
 
 -- Gera o codigo (com prefixo de formato) a partir dos dados coletados.
--- PZRX3 (v2.7+): 17 campos —
+-- PZRX5 (v2.11+): 22 campos —
 --   nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|
---   animals_killed|fish_caught|crops_harvested|items_crafted|houses_looted|hours_without_sleep
--- Campos 12-17 sao inteiros; 0 quando nao reportados pelo engine do jogo.
+--   animals_killed|fish_caught|crops_harvested|items_crafted|houses_looted|hours_without_sleep|
+--   trees_cut|books_read|structures_built|crops_planted|spiffo_visited
+-- Campos 12-22 sao inteiros; 0 quando nao disponivel nesta versao do PZ.
 -- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
 -- Campo traits: IDs separados por virgula (ex: "Athletic,Lucky,Smoker")
 -- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
@@ -168,7 +173,7 @@ function RankCode.generate(entry)
     local ts         = unixTimestamp()
     local ext        = entry.extended or {}
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%d|%d|%d|%d|%d|%d",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
         charName,
         profession,
         entry.kills or 0,
@@ -185,16 +190,21 @@ function RankCode.generate(entry)
         ext.crops_harvested     or 0,
         ext.items_crafted       or 0,
         ext.houses_looted       or 0,
-        ext.hours_without_sleep or 0
+        ext.hours_without_sleep or 0,
+        ext.trees_cut           or 0,
+        ext.books_read          or 0,
+        ext.structures_built    or 0,
+        ext.crops_planted       or 0,
+        ext.spiffo_visited      or 0
     )
 
-    return "PZRX3:" .. obfuscate(plain)
+    return "PZRX5:" .. obfuscate(plain)
 end
 
--- Valida se uma string e um codigo PZRX1/PZRX2 (legado) ou PZRX3 (atual).
+-- Valida se uma string e um codigo PZRX1-PZRX5.
 function RankCode.isValid(code)
     if not code or type(code) ~= "string" then return false end
-    local prefix, encoded = code:match("^(PZRX[123]:)(.+)$")
+    local prefix, encoded = code:match("^(PZRX[12345]:)(.+)$")
     if not prefix then return false end
 
     local ok, plain = pcall(deobfuscate, encoded)

@@ -169,7 +169,7 @@ local function resolveIsDead(player, isDead)
     return false
 end
 
--- Coleta as estatísticas estendidas do PZRX3.
+-- Coleta as estatísticas estendidas do PZRX3/PZRX4/PZRX5.
 -- Para stats sem API direta no Kahlua, lê contadores acumulados no ModData
 -- (incrementados por listeners de evento registrados no RankMain.lua).
 -- Retorna 0 em vez de nil para que o format string nunca gere campo vazio.
@@ -181,6 +181,11 @@ function RankData.collectExtended(player)
         items_crafted       = 0,
         houses_looted       = 0,
         hours_without_sleep = 0,
+        trees_cut           = 0,
+        books_read          = 0,
+        structures_built    = 0,
+        crops_planted       = 0,
+        spiffo_visited      = 0,
     }
 
     -- Lê contadores de ModData (incrementados pelos event listeners)
@@ -196,12 +201,19 @@ function RankData.collectExtended(player)
         result.items_crafted       = readInt("PZCommunityRank_ItemsCrafted")
         result.houses_looted       = readInt("PZCommunityRank_HousesLooted")
         result.hours_without_sleep = readInt("PZCommunityRank_HoursWithoutSleep")
+        result.trees_cut           = readInt("PZCommunityRank_TreesCut")
+        result.books_read          = readInt("PZCommunityRank_BooksRead")
+        result.structures_built    = readInt("PZCommunityRank_StructuresBuilt")
+        result.crops_planted       = readInt("PZCommunityRank_CropsPlanted")
+        result.spiffo_visited      = readInt("PZCommunityRank_SpiffoVisited")
     end
 
     RankLog.info(string.format(
-        "collectExtended: animals=%d fish=%d crops=%d crafted=%d houses=%d nosleep=%d",
+        "collectExtended: animals=%d fish=%d crops=%d crafted=%d houses=%d nosleep=%d trees=%d books=%d struct=%d planted=%d spiffo=%d",
         result.animals_killed, result.fish_caught, result.crops_harvested,
-        result.items_crafted, result.houses_looted, result.hours_without_sleep))
+        result.items_crafted, result.houses_looted, result.hours_without_sleep,
+        result.trees_cut, result.books_read, result.structures_built, result.crops_planted,
+        result.spiffo_visited))
 
     return result
 end
