@@ -28,4 +28,4 @@ if (Test-Path $modInfo) {
     Write-Host "  mod.info copiado"
 }
 
-Write-Host "Sync concluido (v2.6.0)."
+Write-Host "Sync concluido (v2.9.1)."
