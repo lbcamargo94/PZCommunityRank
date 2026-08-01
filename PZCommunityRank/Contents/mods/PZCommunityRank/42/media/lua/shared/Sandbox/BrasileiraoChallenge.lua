@@ -117,7 +117,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
     AlarmDecayModifier   = 14,  -- Baterias morrem 14 dias apos inicio
 
     -- TEMPO / NATUREZA
-    Temperature          = 2,   -- Frio
+    Temperature          = 1,   -- Muito Frio
     Rain                 = 2,   -- Seco
     NightDarkness        = 3,   -- Normal
     NightLength          = 3,

@@ -20,7 +20,7 @@
 --  AlarmDecay:              1=Instantaneo .. 6=0-5 Anos
 --  Alarm:                   1=Nunca .. 6=Muito Frequentemente
 --  NightDarkness:           1=Comp.Escuro  2=Escuro  3=Normal  4=Claro
---  Temperature:             1=Muito Frio   2=Frio    3=Normal  4=Quente  5=M.Quente  [desafio usa 2]
+--  Temperature:             1=Muito Frio   2=Frio    3=Normal  4=Quente  5=M.Quente  [desafio usa 1]
 --  Rain:                    1=Bem Seco     2=Seco    3=Normal  4=Chuvoso 5=B.Chuvoso
 --  FishAbundance/NatureAbundance: 1=Muito Ruim .. 5=Muito Abundante
 --  MetaEvent:               1=Nunca  2=Algumas Vezes  3=Frequentemente
@@ -103,7 +103,7 @@ local RULES = {
 
     -- [ NATUREZA ]
     { key = "NightDarkness",  expected = 3, label = "Escuridao Noite (Normal=3)" },
-    { key = "Temperature",    expected = 2, label = "Temperatura (Frio=2)" },
+    { key = "Temperature",    expected = 1, label = "Temperatura (Muito Frio=1)" },
     { key = "Rain",           expected = 2, label = "Chuva (Seco=2)" },
     { key = "FishAbundance",  expected = 2, label = "Pesca (Ruim=2)" },
     { key = "NatureAbundance",expected = 2, label = "Natureza (Ruim=2)" },
