@@ -1,24 +1,29 @@
 -- ============================================================
 --  RankCode.lua - Gerador do codigo de submissao
 --
---  Formato PZRX5 (v2.11+, 22 campos):
+--  Formato PZRX6 (v2.12+, 34 campos):
 --  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|
 --      <traits>|<motivo>|<ts>|<modver>|
 --      <animals_killed>|<fish_caught>|<crops_harvested>|
 --      <items_crafted>|<houses_looted>|<hours_without_sleep>|
 --      <trees_cut>|<books_read>|<structures_built>|<crops_planted>|
---      <spiffo_visited>
+--      <spiffo_visited>|
+--      <eggs_collected>|<milk_produced>|<stone_structures>|
+--      <ceramic_items>|<forged_weapons>|<km_driven>|
+--      <cities_visited>|<military_visited>|<meals_cooked>|
+--      <water_collected>|<materials_crafted>|<animal_tracks>
 --
 --  <status>:  "morto" ou "vivo"
 --  <sandbox>: "ok" ou "invalido"
 --  <traits>:  IDs separados por virgula (ex: "Athletic,Lucky,Smoker"); pode ser vazio
---  Campos 13-22: inteiros; 0 se nao disponivel nesta versao do PZ
+--  Campos 13-34: inteiros; 0 se nao disponivel nesta versao do PZ
 --
 --  Formatos legados aceitos pelo backend (retrocompat.):
 --    PZRX1: 6 campos (sem status/sandbox/traits)
 --    PZRX2: 11 campos (sem extended stats)
 --    PZRX3: 17 campos
 --    PZRX4: 21 campos
+--    PZRX5: 22 campos
 --
 --  IMPORTANTE: isto e OFUSCACAO, nao criptografia forte - o mod e
 --  Lua aberto (Workshop) e o site e JS aberto no navegador, entao
@@ -33,7 +38,7 @@ require "RankMod/RankLog"
 
 RankCode = {}
 
-local MOD_VERSION = "2.11.2"
+local MOD_VERSION = "2.12.0"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -153,11 +158,13 @@ local function unixTimestamp()
 end
 
 -- Gera o codigo (com prefixo de formato) a partir dos dados coletados.
--- PZRX5 (v2.11+): 22 campos —
+-- PZRX6 (v2.12+): 34 campos —
 --   nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|
 --   animals_killed|fish_caught|crops_harvested|items_crafted|houses_looted|hours_without_sleep|
---   trees_cut|books_read|structures_built|crops_planted|spiffo_visited
--- Campos 12-22 sao inteiros; 0 quando nao disponivel nesta versao do PZ.
+--   trees_cut|books_read|structures_built|crops_planted|spiffo_visited|
+--   eggs_collected|milk_produced|stone_structures|ceramic_items|forged_weapons|km_driven|
+--   cities_visited|military_visited|meals_cooked|water_collected|materials_crafted|animal_tracks
+-- Campos 12-34 sao inteiros; 0 quando nao disponivel nesta versao do PZ.
 -- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
 -- Campo traits: IDs separados por virgula (ex: "Athletic,Lucky,Smoker")
 -- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
@@ -173,7 +180,7 @@ function RankCode.generate(entry)
     local ts         = unixTimestamp()
     local ext        = entry.extended or {}
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
         charName,
         profession,
         entry.kills or 0,
@@ -195,16 +202,28 @@ function RankCode.generate(entry)
         ext.books_read          or 0,
         ext.structures_built    or 0,
         ext.crops_planted       or 0,
-        ext.spiffo_visited      or 0
+        ext.spiffo_visited      or 0,
+        ext.eggs_collected      or 0,
+        ext.milk_produced       or 0,
+        ext.stone_structures    or 0,
+        ext.ceramic_items       or 0,
+        ext.forged_weapons      or 0,
+        ext.km_driven           or 0,
+        ext.cities_visited      or 0,
+        ext.military_visited    or 0,
+        ext.meals_cooked        or 0,
+        ext.water_collected     or 0,
+        ext.materials_crafted   or 0,
+        ext.animal_tracks       or 0
     )
 
-    return "PZRX5:" .. obfuscate(plain)
+    return "PZRX6:" .. obfuscate(plain)
 end
 
--- Valida se uma string e um codigo PZRX1-PZRX5.
+-- Valida se uma string e um codigo PZRX1-PZRX6.
 function RankCode.isValid(code)
     if not code or type(code) ~= "string" then return false end
-    local prefix, encoded = code:match("^(PZRX[12345]:)(.+)$")
+    local prefix, encoded = code:match("^(PZRX[123456]:)(.+)$")
     if not prefix then return false end
 
     local ok, plain = pcall(deobfuscate, encoded)

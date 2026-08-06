@@ -169,7 +169,7 @@ local function resolveIsDead(player, isDead)
     return false
 end
 
--- Coleta as estatísticas estendidas do PZRX3/PZRX4/PZRX5.
+-- Coleta as estatísticas estendidas do PZRX3/PZRX4/PZRX5/PZRX6.
 -- Para stats sem API direta no Kahlua, lê contadores acumulados no ModData
 -- (incrementados por listeners de evento registrados no RankMain.lua).
 -- Retorna 0 em vez de nil para que o format string nunca gere campo vazio.
@@ -186,6 +186,19 @@ function RankData.collectExtended(player)
         structures_built    = 0,
         crops_planted       = 0,
         spiffo_visited      = 0,
+        -- PZRX6
+        eggs_collected      = 0,
+        milk_produced       = 0,
+        stone_structures    = 0,
+        ceramic_items       = 0,
+        forged_weapons      = 0,
+        km_driven           = 0,
+        cities_visited      = 0,
+        military_visited    = 0,
+        meals_cooked        = 0,
+        water_collected     = 0,
+        materials_crafted   = 0,
+        animal_tracks       = 0,
     }
 
     -- Lê contadores de ModData (incrementados pelos event listeners)
@@ -206,14 +219,31 @@ function RankData.collectExtended(player)
         result.structures_built    = readInt("PZCommunityRank_StructuresBuilt")
         result.crops_planted       = readInt("PZCommunityRank_CropsPlanted")
         result.spiffo_visited      = readInt("PZCommunityRank_SpiffoVisited")
+        -- PZRX6
+        result.eggs_collected      = readInt("PZCommunityRank_EggsCollected")
+        result.milk_produced       = readInt("PZCommunityRank_MilkProduced")
+        result.stone_structures    = readInt("PZCommunityRank_StoneStructures")
+        result.ceramic_items       = readInt("PZCommunityRank_CeramicItems")
+        result.forged_weapons      = readInt("PZCommunityRank_ForgedWeapons")
+        result.km_driven           = readInt("PZCommunityRank_KmDriven")
+        result.cities_visited      = readInt("PZCommunityRank_CitiesVisited")
+        result.military_visited    = readInt("PZCommunityRank_MilitaryVisited")
+        result.meals_cooked        = readInt("PZCommunityRank_MealsCooked")
+        result.water_collected     = readInt("PZCommunityRank_WaterCollected")
+        result.materials_crafted   = readInt("PZCommunityRank_MaterialsCrafted")
+        result.animal_tracks       = readInt("PZCommunityRank_AnimalTracks")
     end
 
     RankLog.info(string.format(
-        "collectExtended: animals=%d fish=%d crops=%d crafted=%d houses=%d nosleep=%d trees=%d books=%d struct=%d planted=%d spiffo=%d",
+        "collectExtended: animals=%d fish=%d crops=%d crafted=%d houses=%d nosleep=%d trees=%d books=%d struct=%d planted=%d spiffo=%d eggs=%d milk=%d stone=%d ceramic=%d forged=%d km=%d cities=%d mil=%d meals=%d water=%d mats=%d tracks=%d",
         result.animals_killed, result.fish_caught, result.crops_harvested,
         result.items_crafted, result.houses_looted, result.hours_without_sleep,
         result.trees_cut, result.books_read, result.structures_built, result.crops_planted,
-        result.spiffo_visited))
+        result.spiffo_visited, result.eggs_collected, result.milk_produced,
+        result.stone_structures, result.ceramic_items, result.forged_weapons,
+        result.km_driven, result.cities_visited, result.military_visited,
+        result.meals_cooked, result.water_collected, result.materials_crafted,
+        result.animal_tracks))
 
     return result
 end

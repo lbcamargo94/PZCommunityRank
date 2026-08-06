@@ -871,6 +871,19 @@ pcall(function()
             local result = orig(self)
             if self and self.character and isLocalPlayer(self.character) then
                 incModCounter("PZCommunityRank_StructuresBuilt")
+                -- Verifica se é estrutura de pedra
+                pcall(function()
+                    local n = ""
+                    if self.buildingItem then
+                        local fn = self.buildingItem:getFullName() or ""
+                        local sn = self.buildingItem:getName() or ""
+                        n = (fn .. " " .. sn):lower()
+                    end
+                    if n:find("stone", 1, true) or n:find("pedra", 1, true) or
+                       n:find("rock", 1, true) or n:find("cobble", 1, true) then
+                        incModCounter("PZCommunityRank_StoneStructures")
+                    end
+                end)
             end
             return result
         end
@@ -908,6 +921,235 @@ if not _seedPatched then
         if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_CropsPlanted") end
     end, "Culturas plantadas (evento)")
 end
+
+-- Ovos coletados (B42: coleta manual de ninhos)
+local _eggPatched = false
+pcall(function()
+    require "TimedActions/Animals/ISCollectEgg"
+    if ISCollectEgg and ISCollectEgg.perform and not ISCollectEgg._pzRankPatched then
+        local origEgg = ISCollectEgg.perform
+        ISCollectEgg.perform = function(self)
+            local result = origEgg(self)
+            if result ~= false and self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_EggsCollected")
+            end
+            return result
+        end
+        ISCollectEgg._pzRankPatched = true
+        _eggPatched = true
+        RankLog.info("Ovos coletados: patch instalado.")
+    end
+end)
+if not _eggPatched then
+    addFirstAvailableEvent({ "OnChickenLayEgg", "OnPlayerCollectEgg", "OnCollectEgg" }, function(player)
+        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_EggsCollected") end
+    end, "Ovos coletados (evento)")
+end
+
+-- Leite produzido (B42: ordenha manual de animais)
+local _milkPatched = false
+pcall(function()
+    require "TimedActions/Animals/ISMilkAnimal"
+    if ISMilkAnimal and ISMilkAnimal.perform and not ISMilkAnimal._pzRankPatched then
+        local origMilk = ISMilkAnimal.perform
+        ISMilkAnimal.perform = function(self)
+            local result = origMilk(self)
+            if result ~= false and self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_MilkProduced")
+            end
+            return result
+        end
+        ISMilkAnimal._pzRankPatched = true
+        _milkPatched = true
+        RankLog.info("Leite produzido: patch instalado.")
+    end
+end)
+if not _milkPatched then
+    addFirstAvailableEvent({ "OnPlayerMilkAnimal", "OnMilkAnimal", "OnAnimalMilked" }, function(player)
+        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_MilkProduced") end
+    end, "Leite produzido (evento)")
+end
+
+-- Categorização de receitas: ceramica, armas forjadas, refeicoes, materiais
+-- Registra um handler extra em OnCraftRecipeCompleted (pode coexistir com o handler de ItemsCrafted).
+addFirstAvailableEvent({ "OnCraftRecipeCompleted", "OnCraftResult" }, function(first, second, third)
+    local player = nil
+    for _, c in ipairs({ first, second, third }) do
+        if c then
+            local ok, isLocal = pcall(isLocalPlayer, c)
+            if ok and isLocal then player = c; break end
+        end
+    end
+    if not player then return end
+
+    -- Tenta extrair o nome da receita de qualquer argumento não-player
+    local recipeName = ""
+    for _, c in ipairs({ first, second, third }) do
+        if c and c ~= player then
+            local ok, name = pcall(function()
+                if type(c.getName) == "function" then return tostring(c:getName()) end
+                if type(c.getDisplayName) == "function" then return tostring(c:getDisplayName()) end
+                return ""
+            end)
+            if ok and name and #name > 2 then recipeName = name:lower(); break end
+        end
+    end
+
+    if recipeName:find("ceramic", 1, true) or recipeName:find("clay", 1, true) or
+       recipeName:find("argila", 1, true) or recipeName:find("cerami", 1, true) or
+       recipeName:find("bowl", 1, true)    or recipeName:find("jug", 1, true) then
+        incModCounter("PZCommunityRank_CeramicItems")
+    end
+
+    if recipeName:find("forg", 1, true) or recipeName:find("smelt", 1, true) or
+       recipeName:find("anvil", 1, true) or recipeName:find("forja", 1, true) or
+       recipeName:find("smit", 1, true) then
+        incModCounter("PZCommunityRank_ForgedWeapons")
+    end
+
+    if recipeName:find("cook", 1, true) or recipeName:find("bake", 1, true) or
+       recipeName:find("grill", 1, true) or recipeName:find("cozi", 1, true) or
+       recipeName:find("assar", 1, true) or recipeName:find("stew", 1, true) or
+       recipeName:find("soup", 1, true)  or recipeName:find("fry", 1, true) then
+        incModCounter("PZCommunityRank_MealsCooked")
+    end
+
+    if recipeName:find("plank", 1, true) or recipeName:find("lumber", 1, true) or
+       recipeName:find("board", 1, true) or recipeName:find("taboa", 1, true) or
+       recipeName:find("log ", 1, true) then
+        incModCounter("PZCommunityRank_MaterialsCrafted")
+    end
+end, "Itens por categoria")
+
+-- Quilômetros dirigidos (tracking de posicao do veiculo em OnTick)
+local _lastVehiclePos = nil
+local _pendingKm = 0.0
+local _kmSaveTick = 0
+local KM_SAVE_INTERVAL = 600  -- salva no ModData a cada ~10s (60fps)
+local KM_TILES_PER_KM  = 500  -- ~1 tile = 2m; 500 tiles ≈ 1 km
+
+local function updateVehicleDistance()
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then _lastVehiclePos = nil; return end
+    local vehOk, vehicle = pcall(function() return player:getVehicle() end)
+    if not vehOk or not vehicle then _lastVehiclePos = nil; return end
+
+    local px, py = 0, 0
+    local posOk = pcall(function() px = vehicle:getX(); py = vehicle:getY() end)
+    if not posOk then return end
+
+    if _lastVehiclePos then
+        local dx = px - _lastVehiclePos.x
+        local dy = py - _lastVehiclePos.y
+        _pendingKm = _pendingKm + math.sqrt(dx*dx + dy*dy) / KM_TILES_PER_KM
+    end
+    _lastVehiclePos = { x = px, y = py }
+
+    _kmSaveTick = _kmSaveTick + 1
+    if _kmSaveTick >= KM_SAVE_INTERVAL then
+        _kmSaveTick = 0
+        local mdOk, md = pcall(function() return player:getModData() end)
+        if mdOk and md and _pendingKm >= 0.5 then
+            md["PZCommunityRank_KmDriven"] = (tonumber(md["PZCommunityRank_KmDriven"]) or 0) + math.floor(_pendingKm)
+            _pendingKm = 0.0
+        end
+    end
+end
+addOptionalEvent("OnTick", updateVehicleDistance)
+
+-- Cidades e bases militares visitadas (verificacao periodica de zonas do tile atual)
+local _visitedCityZones = {}
+local _visitedMilZones  = {}
+
+local function checkZoneVisit()
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
+    local sqOk, sq = pcall(function() return player:getCurrentSquare() end)
+    if not sqOk or not sq then return end
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+
+    -- Tenta via getZoneList()
+    pcall(function()
+        local zl = sq:getZoneList()
+        if not zl then return end
+        local size = 0
+        pcall(function() size = zl:size() end)
+        for i = 0, size - 1 do
+            local zone = nil
+            pcall(function() zone = zl:get(i) end)
+            if not zone then break end
+
+            local zoneName, zoneType = "", ""
+            pcall(function() zoneName = tostring(zone:getName() or "") end)
+            pcall(function() zoneType = tostring(zone:getType() or "") end)
+            local nl = zoneName:lower()
+            local tl = zoneType:lower()
+
+            -- Cidades (zona de tipo Town/City ou nome de cidade conhecida)
+            if not _visitedCityZones[zoneName] then
+                if tl:find("town", 1, true) or tl:find("city", 1, true) or
+                   nl:find("muldraugh", 1, true) or nl:find("rosewood", 1, true) or
+                   nl:find("west point", 1, true) or nl:find("riverside", 1, true) or
+                   nl:find("louisville", 1, true) or nl:find("march ridge", 1, true) or
+                   nl:find("ekron", 1, true) or nl:find("doe valley", 1, true) then
+                    _visitedCityZones[zoneName] = true
+                    md["PZCommunityRank_CitiesVisited"] = (tonumber(md["PZCommunityRank_CitiesVisited"]) or 0) + 1
+                    RankLog.info("Cidade visitada: " .. zoneName)
+                end
+            end
+
+            -- Base militar
+            if not _visitedMilZones[zoneName] then
+                if tl:find("mil", 1, true) or nl:find("mil", 1, true) or
+                   nl:find("fort", 1, true) or nl:find("base", 1, true) then
+                    _visitedMilZones[zoneName] = true
+                    md["PZCommunityRank_MilitaryVisited"] = (tonumber(md["PZCommunityRank_MilitaryVisited"]) or 0) + 1
+                    RankLog.info("Base militar visitada: " .. zoneName)
+                end
+            end
+        end
+    end)
+
+    -- Fallback: verifica nome do room atual para bases militares
+    pcall(function()
+        local room = sq:getRoom()
+        if not room then return end
+        local roomName = tostring(room:getName() or ""):lower()
+        local roomKey = "room_" .. roomName
+        if not _visitedMilZones[roomKey] then
+            if roomName:find("armory", 1, true) or roomName:find("barracks", 1, true) or
+               roomName:find("guardpost", 1, true) or roomName:find("military", 1, true) then
+                _visitedMilZones[roomKey] = true
+                md["PZCommunityRank_MilitaryVisited"] = (tonumber(md["PZCommunityRank_MilitaryVisited"]) or 0) + 1
+                RankLog.info("Base militar visitada (room): " .. roomName)
+            end
+        end
+    end)
+end
+
+local _zoneCheckTick = 0
+local ZONE_CHECK_TICKS = 1800  -- ~30s a 60fps
+addOptionalEvent("OnTick", function()
+    _zoneCheckTick = _zoneCheckTick + 1
+    if _zoneCheckTick >= ZONE_CHECK_TICKS then
+        _zoneCheckTick = 0
+        if not _isStartingUp then pcall(checkZoneVisit) end
+    end
+end)
+
+-- Água coletada (torneiras, pocos, chuva)
+addFirstAvailableEvent({ "OnPlayerFillContainer", "OnFillLiquidContainer", "OnFillContainer" }, function(first, second)
+    local player = second or first
+    if not player or not isLocalPlayer(player) then return end
+    incModCounter("PZCommunityRank_WaterCollected")
+end, "Agua coletada")
+
+-- Rastros de animais rastreados
+addFirstAvailableEvent({ "OnPlayerTrackAnimal", "OnAnimalTrackFound", "OnTrackAnimal" }, function(player)
+    if not player or not isLocalPlayer(player) then return end
+    incModCounter("PZCommunityRank_AnimalTracks")
+end, "Rastros de animais")
 
 if Events.OnTryTalkInChat then
     Events.OnTryTalkInChat.Add(onChatCommand)
@@ -1064,4 +1306,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.11.2")
+RankLog.info("Mod carregado - B42.20 | v2.12.0")
