@@ -778,6 +778,20 @@ addFirstAvailableEvent({ "OnPlayerStartSleeping", "OnPlayerSleep" }, function(pl
     if hOk and hours then
         md["PZCommunityRank_LastSleepHours"] = hours
     end
+    -- Rastreia locais únicos de sono (célula de 20x20 tiles)
+    pcall(function()
+        local xOk, x = pcall(function() return player:getX() end)
+        local yOk, y = pcall(function() return player:getY() end)
+        if not xOk or not yOk then return end
+        local cx = math.floor(x / 20)
+        local cy = math.floor(y / 20)
+        local tag = "|" .. cx .. "_" .. cy .. "|"
+        local setStr = md["PZCommunityRank_SleepLocSet"] or ""
+        if not setStr:find(tag, 1, true) then
+            md["PZCommunityRank_SleepLocSet"] = setStr .. tag
+            md["PZCommunityRank_SleepLocations"] = (tonumber(md["PZCommunityRank_SleepLocations"]) or 0) + 1
+        end
+    end)
 end, "Inicio do sono")
 
 -- Restaurantes Spiffo visitados — detecta pelo tipo de room (spiffo_dining / spiffoskitchen)
@@ -871,7 +885,7 @@ pcall(function()
             local result = orig(self)
             if self and self.character and isLocalPlayer(self.character) then
                 incModCounter("PZCommunityRank_StructuresBuilt")
-                -- Verifica se é estrutura de pedra
+                -- Verifica se é estrutura de pedra ou móvel
                 pcall(function()
                     local n = ""
                     if self.buildingItem then
@@ -882,6 +896,17 @@ pcall(function()
                     if n:find("stone", 1, true) or n:find("pedra", 1, true) or
                        n:find("rock", 1, true) or n:find("cobble", 1, true) then
                         incModCounter("PZCommunityRank_StoneStructures")
+                    end
+                    if n:find("chair", 1, true) or n:find("table", 1, true) or
+                       n:find("sofa", 1, true)  or n:find("couch", 1, true) or
+                       n:find("shelf", 1, true) or n:find("desk", 1, true) or
+                       n:find("bed", 1, true)   or n:find("crib", 1, true) or
+                       n:find("cabinet", 1, true) or n:find("drawer", 1, true) or
+                       n:find("wardrobe", 1, true) or n:find("bookcase", 1, true) or
+                       n:find("cadeira", 1, true) or n:find("mesa", 1, true) or
+                       n:find("cama", 1, true)   or n:find("prateleira", 1, true) or
+                       n:find("armario", 1, true) or n:find("estante", 1, true) then
+                        incModCounter("PZCommunityRank_FurnitureCrafted")
                     end
                 end)
             end
@@ -982,8 +1007,9 @@ addFirstAvailableEvent({ "OnCraftRecipeCompleted", "OnCraftResult" }, function(f
     end
     if not player then return end
 
-    -- Tenta extrair o nome da receita de qualquer argumento não-player
+    -- Tenta extrair o nome e categoria da receita de qualquer argumento não-player
     local recipeName = ""
+    local recipeCategory = ""
     for _, c in ipairs({ first, second, third }) do
         if c and c ~= player then
             local ok, name = pcall(function()
@@ -994,31 +1020,148 @@ addFirstAvailableEvent({ "OnCraftRecipeCompleted", "OnCraftResult" }, function(f
             if ok and name and #name > 2 then recipeName = name:lower(); break end
         end
     end
+    for _, c in ipairs({ first, second, third }) do
+        if c and c ~= player then
+            local ok, cat = pcall(function()
+                if type(c.getCategory) == "function" then return tostring(c:getCategory()) end
+                return ""
+            end)
+            if ok and cat and #cat > 2 then recipeCategory = cat:lower(); break end
+        end
+    end
+    local recipeKey = recipeCategory .. " " .. recipeName
 
-    if recipeName:find("ceramic", 1, true) or recipeName:find("clay", 1, true) or
-       recipeName:find("argila", 1, true) or recipeName:find("cerami", 1, true) or
-       recipeName:find("bowl", 1, true)    or recipeName:find("jug", 1, true) then
+    if recipeKey:find("ceramic", 1, true) or recipeKey:find("clay", 1, true) or
+       recipeKey:find("argila", 1, true) or recipeKey:find("cerami", 1, true) or
+       recipeKey:find("pottery", 1, true) or recipeKey:find("bowl", 1, true) or
+       recipeKey:find("jug", 1, true) then
         incModCounter("PZCommunityRank_CeramicItems")
     end
 
-    if recipeName:find("forg", 1, true) or recipeName:find("smelt", 1, true) or
-       recipeName:find("anvil", 1, true) or recipeName:find("forja", 1, true) or
-       recipeName:find("smit", 1, true) then
+    if recipeKey:find("forg", 1, true) or recipeKey:find("smelt", 1, true) or
+       recipeKey:find("anvil", 1, true) or recipeKey:find("forja", 1, true) or
+       recipeKey:find("smit", 1, true) or recipeKey:find("blacksmith", 1, true) then
         incModCounter("PZCommunityRank_ForgedWeapons")
     end
 
-    if recipeName:find("cook", 1, true) or recipeName:find("bake", 1, true) or
-       recipeName:find("grill", 1, true) or recipeName:find("cozi", 1, true) or
-       recipeName:find("assar", 1, true) or recipeName:find("stew", 1, true) or
-       recipeName:find("soup", 1, true)  or recipeName:find("fry", 1, true) then
+    if recipeKey:find("cook", 1, true) or recipeKey:find("bake", 1, true) or
+       recipeKey:find("grill", 1, true) or recipeKey:find("cozi", 1, true) or
+       recipeKey:find("assar", 1, true) or recipeKey:find("stew", 1, true) or
+       recipeKey:find("soup", 1, true)  or recipeKey:find("fry", 1, true) or
+       recipeKey:find("roast", 1, true) or recipeKey:find("simmer", 1, true) then
         incModCounter("PZCommunityRank_MealsCooked")
     end
 
-    if recipeName:find("plank", 1, true) or recipeName:find("lumber", 1, true) or
-       recipeName:find("board", 1, true) or recipeName:find("taboa", 1, true) or
-       recipeName:find("log ", 1, true) then
+    if recipeKey:find("plank", 1, true) or recipeKey:find("lumber", 1, true) or
+       recipeKey:find("board", 1, true) or recipeKey:find("taboa", 1, true) or
+       recipeKey:find("log ", 1, true) then
         incModCounter("PZCommunityRank_MaterialsCrafted")
     end
+
+    -- Roupas fabricadas: instanceof Clothing nos itens resultantes
+    local clothesFound = false
+    for _, c in ipairs({ first, second, third }) do
+        if c and c ~= player then
+            local okSz, sz = pcall(function() return c.size and c:size() or -1 end)
+            if okSz and type(sz) == "number" and sz >= 0 then
+                for i = 0, sz - 1 do
+                    local okIt, item = pcall(function() return c:get(i) end)
+                    if okIt and item then
+                        local okC, isC = pcall(function() return instanceof(item, "Clothing") end)
+                        if okC and isC then clothesFound = true; break end
+                    end
+                end
+            end
+        end
+        if clothesFound then break end
+    end
+    if not clothesFound then
+        if recipeKey:find("sew", 1, true) or recipeKey:find("tailor", 1, true) or
+           recipeKey:find("costur", 1, true) or recipeKey:find("clothing", 1, true) or
+           recipeKey:find("shirt", 1, true) or recipeKey:find("pants", 1, true) or
+           recipeKey:find("jacket", 1, true) or recipeKey:find("vest", 1, true) or
+           recipeKey:find("camiseta", 1, true) or recipeKey:find("calca", 1, true) or
+           recipeKey:find("jaqueta", 1, true) or recipeKey:find("blusa", 1, true) then
+            clothesFound = true
+        end
+    end
+    if clothesFound then incModCounter("PZCommunityRank_ClothesCrafted") end
+
+    -- Queijo produzido
+    if recipeKey:find("cheese", 1, true) or recipeKey:find("queijo", 1, true) then
+        incModCounter("PZCommunityRank_CheeseProduced")
+    end
+
+    -- Estacoes de craft usadas: track categorias unicas
+    pcall(function()
+        local ok2, player2 = pcall(getPlayer)
+        if not ok2 or not player2 then return end
+        local mdOk, md = pcall(function() return player2:getModData() end)
+        if not mdOk or not md then return end
+        local setKey = "PZCommunityRank_StationsSet"
+        local setStr = md[setKey] or ""
+        local changed = false
+        local function addSt(tag)
+            local t = "|" .. tag .. "|"
+            if setStr:find(t, 1, true) then return end
+            setStr = setStr .. t; changed = true
+        end
+        if recipeKey:find("wood", 1, true) or recipeKey:find("carpent", 1, true) or
+           recipeKey:find("madei", 1, true) or recipeKey:find("marcen", 1, true) then addSt("woodwork") end
+        if recipeKey:find("weld", 1, true) or recipeKey:find("metalwork", 1, true) or
+           recipeKey:find("sold", 1, true) or recipeKey:find("metal ", 1, true) then addSt("metalwork") end
+        if recipeKey:find("forg", 1, true) or recipeKey:find("anvil", 1, true) or
+           recipeKey:find("blacksmith", 1, true) or recipeKey:find("ferr", 1, true) then addSt("blacksmith") end
+        if recipeKey:find("mason", 1, true) or recipeKey:find("alvenar", 1, true) or
+           recipeKey:find("mortar", 1, true) or recipeKey:find("brick", 1, true) then addSt("masonry") end
+        if recipeKey:find("potter", 1, true) or recipeKey:find("ceramic", 1, true) or
+           recipeKey:find("clay", 1, true) or recipeKey:find("argila", 1, true) then addSt("pottery") end
+        if recipeKey:find("glass", 1, true) or recipeKey:find("vidro", 1, true) or
+           recipeKey:find("kiln", 1, true) then addSt("glassmaking") end
+        if recipeKey:find("sew", 1, true) or recipeKey:find("tailor", 1, true) or
+           recipeKey:find("costur", 1, true) or recipeKey:find("clothing", 1, true) then addSt("tailoring") end
+        if recipeKey:find("cook", 1, true) or recipeKey:find("bake", 1, true) or
+           recipeKey:find("grill", 1, true) or recipeKey:find("cozi", 1, true) then addSt("cooking") end
+        if changed then
+            md[setKey] = setStr
+            local cnt = 0
+            setStr:gsub("|[^|]+|", function() cnt = cnt + 1 end)
+            md["PZCommunityRank_StationsUsed"] = cnt
+        end
+    end)
+
+    -- Armas fabricadas: tenta instanceof HandWeapon nos itens resultantes (arg que tem size()),
+    -- com fallback por palavras-chave no nome da receita.
+    local weaponFound = false
+    for _, c in ipairs({ first, second, third }) do
+        if c and c ~= player then
+            local okSz, sz = pcall(function() return c.size and c:size() or -1 end)
+            if okSz and type(sz) == "number" and sz >= 0 then
+                for i = 0, sz - 1 do
+                    local okIt, item = pcall(function() return c:get(i) end)
+                    if okIt and item then
+                        local okW, isW = pcall(function() return instanceof(item, "HandWeapon") end)
+                        if okW and isW then weaponFound = true; break end
+                    end
+                end
+            end
+        end
+        if weaponFound then break end
+    end
+    if not weaponFound then
+        if recipeName:find("spear", 1, true) or recipeName:find("lan%p?a", 1, false) or
+           recipeName:find("lance", 1, true) or recipeName:find("knife", 1, true) or
+           recipeName:find("faca",  1, true) or recipeName:find("blade", 1, true) or
+           recipeName:find("sword", 1, true) or recipeName:find("espada",1, true) or
+           recipeName:find("arrow", 1, true) or recipeName:find("flecha",1, true) or
+           recipeName:find("bow",   1, true) or recipeName:find("arco",  1, true) or
+           recipeName:find("club",  1, true) or recipeName:find("clava", 1, true) or
+           recipeName:find("pike",  1, true) or recipeName:find("shiv",  1, true) or
+           recipeName:find("shank", 1, true) or recipeName:find("mace",  1, true) then
+            weaponFound = true
+        end
+    end
+    if weaponFound then incModCounter("PZCommunityRank_WeaponsCrafted") end
 end, "Itens por categoria")
 
 -- Quilômetros dirigidos (tracking de posicao do veiculo em OnTick)
@@ -1134,7 +1277,10 @@ addOptionalEvent("OnTick", function()
     _zoneCheckTick = _zoneCheckTick + 1
     if _zoneCheckTick >= ZONE_CHECK_TICKS then
         _zoneCheckTick = 0
-        if not _isStartingUp then pcall(checkZoneVisit) end
+        if not _isStartingUp then
+            pcall(checkZoneVisit)
+            pcall(checkBasementVisit)
+        end
     end
 end)
 
@@ -1191,6 +1337,145 @@ pcall(function()
     end)
 end)
 
+-- ── Novos contadores PZRX8 ──────────────────────────────────────────────────
+
+-- Portas abertas
+local _doorPatched = false
+pcall(function()
+    require "TimedActions/ISOpenDoorAction"
+    if ISOpenDoorAction and ISOpenDoorAction.perform and not ISOpenDoorAction._pzRankPatched then
+        local orig = ISOpenDoorAction.perform
+        ISOpenDoorAction.perform = function(self)
+            local result = orig(self)
+            if self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_DoorsOpened")
+            end
+            return result
+        end
+        ISOpenDoorAction._pzRankPatched = true
+        _doorPatched = true
+        RankLog.info("Portas abertas: patch instalado.")
+    end
+end)
+if not _doorPatched then
+    addFirstAvailableEvent({ "OnDoorOpen", "OnOpenDoor" }, function(player)
+        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_DoorsOpened") end
+    end, "Portas abertas (evento)")
+end
+
+-- Poroes explorados: conta edificios unicos visitados no subsolo (z < 0)
+local function checkBasementVisit()
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
+    local zOk, z = pcall(function() return player:getZ() end)
+    if not zOk or not z or z >= 0 then return end
+    local sqOk, sq = pcall(function() return player:getCurrentSquare() end)
+    if not sqOk or not sq then return end
+    local bldOk, bldId = pcall(function()
+        local bld = sq:getBuilding()
+        return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
+    end)
+    if not bldOk or not bldId then return end
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+    local tag = "|" .. bldId .. "|"
+    local setStr = md["PZCommunityRank_BasementSet"] or ""
+    if setStr:find(tag, 1, true) then return end
+    md["PZCommunityRank_BasementSet"] = setStr .. tag
+    md["PZCommunityRank_BasementsExplored"] = (tonumber(md["PZCommunityRank_BasementsExplored"]) or 0) + 1
+    RankLog.info("Porao explorado: bldId=" .. bldId)
+end
+
+-- Dias sem enlatados: patch em ISEatFoodAction, flag persistida no ModData
+local _eatFoodPatched = false
+pcall(function()
+    require "TimedActions/ISEatFoodAction"
+    if ISEatFoodAction and ISEatFoodAction.perform and not ISEatFoodAction._pzRankPatched then
+        local orig = ISEatFoodAction.perform
+        ISEatFoodAction.perform = function(self)
+            local result = orig(self)
+            if result ~= false and self and self.character and isLocalPlayer(self.character) then
+                pcall(function()
+                    local item = self.item
+                    if not item then return end
+                    local typeName = tostring(item:getType() or ""):lower()
+                    local dispName = tostring(item:getDisplayName() or ""):lower()
+                    if typeName:find("can", 1, true) or typeName:find("tin", 1, true) or
+                       dispName:find("canned", 1, true) or dispName:find("enlatad", 1, true) then
+                        local mdOk, md = pcall(function() return self.character:getModData() end)
+                        if mdOk and md then md["PZCommunityRank_AteCannedToday"] = 1 end
+                    end
+                end)
+            end
+            return result
+        end
+        ISEatFoodAction._pzRankPatched = true
+        _eatFoodPatched = true
+        RankLog.info("Dias sem enlatados: patch instalado.")
+    end
+end)
+
+-- Especies de animais criados/alimentados
+local _animalSpeciesPatched = false
+pcall(function()
+    require "TimedActions/Animals/ISFeedAnimal"
+    if ISFeedAnimal and ISFeedAnimal.perform and not ISFeedAnimal._pzRankPatched then
+        local orig = ISFeedAnimal.perform
+        ISFeedAnimal.perform = function(self)
+            local result = orig(self)
+            if result ~= false and self and self.character and isLocalPlayer(self.character) and self.animal then
+                pcall(function()
+                    local animal = self.animal
+                    local speciesOk, species = pcall(function()
+                        if type(animal.getSpecies) == "function" then
+                            return tostring(animal:getSpecies())
+                        end
+                        if type(animal.getType) == "function" then
+                            return tostring(animal:getType())
+                        end
+                        return nil
+                    end)
+                    if not speciesOk or not species or species == "" or species == "nil" then return end
+                    local mdOk, md = pcall(function() return self.character:getModData() end)
+                    if not mdOk or not md then return end
+                    local tag = "|" .. species:lower() .. "|"
+                    local setStr = md["PZCommunityRank_AnimalSpeciesSet"] or ""
+                    if not setStr:find(tag, 1, true) then
+                        md["PZCommunityRank_AnimalSpeciesSet"] = setStr .. tag
+                        md["PZCommunityRank_AnimalSpecies"] = (tonumber(md["PZCommunityRank_AnimalSpecies"]) or 0) + 1
+                        RankLog.info("Nova especie de animal: " .. species)
+                    end
+                end)
+            end
+            return result
+        end
+        ISFeedAnimal._pzRankPatched = true
+        _animalSpeciesPatched = true
+        RankLog.info("Especies de animais: patch instalado.")
+    end
+end)
+if not _animalSpeciesPatched then
+    addFirstAvailableEvent({ "OnAnimalFed", "OnFeedAnimal" }, function(animal, player)
+        if not player or not isLocalPlayer(player) then return end
+        if not animal then return end
+        pcall(function()
+            local speciesOk, species = pcall(function()
+                if type(animal.getSpecies) == "function" then return tostring(animal:getSpecies()) end
+                return tostring(animal:getType())
+            end)
+            if not speciesOk or not species or species == "" then return end
+            local mdOk, md = pcall(function() return player:getModData() end)
+            if not mdOk or not md then return end
+            local tag = "|" .. species:lower() .. "|"
+            local setStr = md["PZCommunityRank_AnimalSpeciesSet"] or ""
+            if not setStr:find(tag, 1, true) then
+                md["PZCommunityRank_AnimalSpeciesSet"] = setStr .. tag
+                md["PZCommunityRank_AnimalSpecies"] = (tonumber(md["PZCommunityRank_AnimalSpecies"]) or 0) + 1
+            end
+        end)
+    end, "Especies de animais (evento)")
+end
+
 -- -- Atualizacao ao matar um zumbi (debounce: 1 sync a cada 5 kills) --
 pcall(function()
     Events.OnZombieDead.Add(function(zombie)
@@ -1221,6 +1506,17 @@ pcall(function()
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isLocalPlayer(player) then return end
+        -- Atualiza contador de dias sem enlatados
+        pcall(function()
+            local mdOk, md = pcall(function() return player:getModData() end)
+            if not mdOk or not md then return end
+            if md["PZCommunityRank_AteCannedToday"] == 1 then
+                md["PZCommunityRank_DaysNoCanned"] = 0
+            else
+                md["PZCommunityRank_DaysNoCanned"] = (tonumber(md["PZCommunityRank_DaysNoCanned"]) or 0) + 1
+            end
+            md["PZCommunityRank_AteCannedToday"] = 0
+        end)
         if _isChallengeGame then
             local p2 = player
             pcall(function() checkDebugMode(p2) end)
@@ -1306,4 +1602,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.12.0")
+RankLog.info("Mod carregado - B42.20 | v2.13.0")

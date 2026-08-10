@@ -199,6 +199,17 @@ function RankData.collectExtended(player)
         water_collected     = 0,
         materials_crafted   = 0,
         animal_tracks       = 0,
+        -- PZRX7/PZRX8
+        weapons_crafted     = 0,
+        furniture_crafted   = 0,
+        clothes_crafted     = 0,
+        cheese_produced     = 0,
+        doors_opened        = 0,
+        sleep_locations     = 0,
+        basements_explored  = 0,
+        stations_used       = 0,
+        animal_species      = 0,
+        days_no_canned      = 0,
     }
 
     -- Lê contadores de ModData (incrementados pelos event listeners)
@@ -232,10 +243,21 @@ function RankData.collectExtended(player)
         result.water_collected     = readInt("PZCommunityRank_WaterCollected")
         result.materials_crafted   = readInt("PZCommunityRank_MaterialsCrafted")
         result.animal_tracks       = readInt("PZCommunityRank_AnimalTracks")
+        -- PZRX7/PZRX8
+        result.weapons_crafted     = readInt("PZCommunityRank_WeaponsCrafted")
+        result.furniture_crafted   = readInt("PZCommunityRank_FurnitureCrafted")
+        result.clothes_crafted     = readInt("PZCommunityRank_ClothesCrafted")
+        result.cheese_produced     = readInt("PZCommunityRank_CheeseProduced")
+        result.doors_opened        = readInt("PZCommunityRank_DoorsOpened")
+        result.sleep_locations     = readInt("PZCommunityRank_SleepLocations")
+        result.basements_explored  = readInt("PZCommunityRank_BasementsExplored")
+        result.stations_used       = readInt("PZCommunityRank_StationsUsed")
+        result.animal_species      = readInt("PZCommunityRank_AnimalSpecies")
+        result.days_no_canned      = readInt("PZCommunityRank_DaysNoCanned")
     end
 
     RankLog.info(string.format(
-        "collectExtended: animals=%d fish=%d crops=%d crafted=%d houses=%d nosleep=%d trees=%d books=%d struct=%d planted=%d spiffo=%d eggs=%d milk=%d stone=%d ceramic=%d forged=%d km=%d cities=%d mil=%d meals=%d water=%d mats=%d tracks=%d",
+        "collectExtended: animals=%d fish=%d crops=%d crafted=%d houses=%d nosleep=%d trees=%d books=%d struct=%d planted=%d spiffo=%d eggs=%d milk=%d stone=%d ceramic=%d forged=%d km=%d cities=%d mil=%d meals=%d water=%d mats=%d tracks=%d weapons=%d furn=%d clothes=%d cheese=%d doors=%d sleep=%d basements=%d stations=%d species=%d nocanned=%d",
         result.animals_killed, result.fish_caught, result.crops_harvested,
         result.items_crafted, result.houses_looted, result.hours_without_sleep,
         result.trees_cut, result.books_read, result.structures_built, result.crops_planted,
@@ -243,7 +265,10 @@ function RankData.collectExtended(player)
         result.stone_structures, result.ceramic_items, result.forged_weapons,
         result.km_driven, result.cities_visited, result.military_visited,
         result.meals_cooked, result.water_collected, result.materials_crafted,
-        result.animal_tracks))
+        result.animal_tracks, result.weapons_crafted,
+        result.furniture_crafted, result.clothes_crafted, result.cheese_produced,
+        result.doors_opened, result.sleep_locations, result.basements_explored,
+        result.stations_used, result.animal_species, result.days_no_canned))
 
     return result
 end
