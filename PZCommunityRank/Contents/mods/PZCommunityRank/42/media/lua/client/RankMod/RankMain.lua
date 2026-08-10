@@ -1273,6 +1273,30 @@ local function checkZoneVisit()
     end)
 end
 
+-- Poroes explorados: conta edificios unicos visitados no subsolo (z < 0)
+-- DECLARADO ANTES do OnTick que o chama para evitar forward-reference nil
+local function checkBasementVisit()
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
+    local zOk, z = pcall(function() return player:getZ() end)
+    if not zOk or not z or z >= 0 then return end
+    local sqOk, sq = pcall(function() return player:getCurrentSquare() end)
+    if not sqOk or not sq then return end
+    local bldOk, bldId = pcall(function()
+        local bld = sq:getBuilding()
+        return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
+    end)
+    if not bldOk or not bldId then return end
+    local mdOk, md = pcall(function() return player:getModData() end)
+    if not mdOk or not md then return end
+    local tag = "|" .. bldId .. "|"
+    local setStr = md["PZCommunityRank_BasementSet"] or ""
+    if setStr:find(tag, 1, true) then return end
+    md["PZCommunityRank_BasementSet"] = setStr .. tag
+    md["PZCommunityRank_BasementsExplored"] = (tonumber(md["PZCommunityRank_BasementsExplored"]) or 0) + 1
+    RankLog.info("Porao explorado: bldId=" .. bldId)
+end
+
 local _zoneCheckTick = 0
 local ZONE_CHECK_TICKS = 1800  -- ~30s a 60fps
 addOptionalEvent("OnTick", function()
@@ -1365,29 +1389,6 @@ if not _doorPatched then
     end, "Portas abertas (evento)")
 end
 
--- Poroes explorados: conta edificios unicos visitados no subsolo (z < 0)
-local function checkBasementVisit()
-    local ok, player = pcall(getPlayer)
-    if not ok or not player then return end
-    local zOk, z = pcall(function() return player:getZ() end)
-    if not zOk or not z or z >= 0 then return end
-    local sqOk, sq = pcall(function() return player:getCurrentSquare() end)
-    if not sqOk or not sq then return end
-    local bldOk, bldId = pcall(function()
-        local bld = sq:getBuilding()
-        return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
-    end)
-    if not bldOk or not bldId then return end
-    local mdOk, md = pcall(function() return player:getModData() end)
-    if not mdOk or not md then return end
-    local tag = "|" .. bldId .. "|"
-    local setStr = md["PZCommunityRank_BasementSet"] or ""
-    if setStr:find(tag, 1, true) then return end
-    md["PZCommunityRank_BasementSet"] = setStr .. tag
-    md["PZCommunityRank_BasementsExplored"] = (tonumber(md["PZCommunityRank_BasementsExplored"]) or 0) + 1
-    RankLog.info("Porao explorado: bldId=" .. bldId)
-end
-
 -- Dias sem enlatados: patch em ISEatFoodAction, flag persistida no ModData
 local _eatFoodPatched = false
 pcall(function()
@@ -1400,10 +1401,22 @@ pcall(function()
                 pcall(function()
                     local item = self.item
                     if not item then return end
-                    local typeName = tostring(item:getType() or ""):lower()
-                    local dispName = tostring(item:getDisplayName() or ""):lower()
-                    if typeName:find("can", 1, true) or typeName:find("tin", 1, true) or
-                       dispName:find("canned", 1, true) or dispName:find("enlatad", 1, true) then
+                    -- getEatType() retorna "Can"/"Candrink" para enlatados (API vanilla)
+                    local isCanned = false
+                    local eatOk, eatType = pcall(function() return tostring(item:getEatType() or "") end)
+                    if eatOk and (eatType == "Can" or eatType == "Candrink") then
+                        isCanned = true
+                    end
+                    -- fallback por nome caso getEatType nao esteja disponivel
+                    if not isCanned then
+                        local typeName = tostring(item:getType() or ""):lower()
+                        local dispName = tostring(item:getDisplayName() or ""):lower()
+                        if typeName:find("can", 1, true) or typeName:find("tin", 1, true) or
+                           dispName:find("canned", 1, true) or dispName:find("enlatad", 1, true) then
+                            isCanned = true
+                        end
+                    end
+                    if isCanned then
                         local mdOk, md = pcall(function() return self.character:getModData() end)
                         if mdOk and md then md["PZCommunityRank_AteCannedToday"] = 1 end
                     end
@@ -1604,4 +1617,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.13.0")
+RankLog.info("Mod carregado - B42.20 | v2.13.1")
