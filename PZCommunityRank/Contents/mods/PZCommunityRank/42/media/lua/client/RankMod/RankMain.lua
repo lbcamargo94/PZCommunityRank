@@ -1212,7 +1212,8 @@ local function checkZoneVisit()
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
 
-    -- Tenta via getZoneList()
+    -- Tenta via getZoneList() — método pode não existir em todas as builds B42
+    if sq.getZoneList ~= nil then
     pcall(function()
         local zl = sq:getZoneList()
         if not zl then return end
@@ -1253,6 +1254,7 @@ local function checkZoneVisit()
             end
         end
     end)
+    end -- sq.getZoneList ~= nil
 
     -- Fallback: verifica nome do room atual para bases militares
     pcall(function()
