@@ -302,6 +302,10 @@ local function safeSilentUpdate(player, playerIndex)
 end
 
 local function isLocalPlayer(player)
+    if not player then return false end
+    -- Kahlua lanca RuntimeException ao chamar metodo nil via ':' mesmo dentro de pcall.
+    -- Guard necessario quando o evento passa um ItemContainer em vez de IsoPlayer.
+    if player.isLocalPlayer == nil then return false end
     local ok, result = pcall(function() return player:isLocalPlayer() end)
     if ok and result == true  then return true  end
     if ok and result == false then return false end
@@ -1617,4 +1621,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.13.2")
+RankLog.info("Mod carregado - B42.20 | v2.13.3")
