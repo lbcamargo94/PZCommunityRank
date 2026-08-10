@@ -891,12 +891,8 @@ pcall(function()
                 incModCounter("PZCommunityRank_StructuresBuilt")
                 -- Verifica se é estrutura de pedra ou móvel
                 pcall(function()
-                    local n = ""
-                    if self.buildingItem then
-                        local fn = self.buildingItem:getFullName() or ""
-                        local sn = self.buildingItem:getName() or ""
-                        n = (fn .. " " .. sn):lower()
-                    end
+                    -- self.item e a definicao da construcao (tabela Lua com campo .name)
+                    local n = tostring(self.item and self.item.name or ""):lower()
                     if n:find("stone", 1, true) or n:find("pedra", 1, true) or
                        n:find("rock", 1, true) or n:find("cobble", 1, true) then
                         incModCounter("PZCommunityRank_StoneStructures")
@@ -1369,22 +1365,23 @@ end)
 
 -- ── Novos contadores PZRX8 ──────────────────────────────────────────────────
 
--- Portas abertas
+-- Portas abertas — B42.20 usa ISOpenCloseDoor (shared), nao ISOpenDoorAction.
+-- A logica real esta em complete() (ToggleDoor); perform() e so cleanup.
 local _doorPatched = false
 pcall(function()
-    require "TimedActions/ISOpenDoorAction"
-    if ISOpenDoorAction and ISOpenDoorAction.perform and not ISOpenDoorAction._pzRankPatched then
-        local orig = ISOpenDoorAction.perform
-        ISOpenDoorAction.perform = function(self)
+    require "TimedActions/ISOpenCloseDoor"
+    if ISOpenCloseDoor and ISOpenCloseDoor.complete and not ISOpenCloseDoor._pzRankPatched then
+        local orig = ISOpenCloseDoor.complete
+        ISOpenCloseDoor.complete = function(self)
             local result = orig(self)
             if self and self.character and isLocalPlayer(self.character) then
                 incModCounter("PZCommunityRank_DoorsOpened")
             end
             return result
         end
-        ISOpenDoorAction._pzRankPatched = true
+        ISOpenCloseDoor._pzRankPatched = true
         _doorPatched = true
-        RankLog.info("Portas abertas: patch instalado.")
+        RankLog.info("Portas abertas: patch ISOpenCloseDoor.complete instalado.")
     end
 end)
 if not _doorPatched then
@@ -1621,4 +1618,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.13.3")
+RankLog.info("Mod carregado - B42.20 | v2.13.4")

@@ -1,6 +1,6 @@
 name=PZ Community Rank
 id=PZCommunityRank
 description=Rastreia sua run e sincroniza automaticamente com o ranking via PZ Rank Companion. Cadastre-se em pzrank.com.br para participar.
-modversion=2.13.3
+modversion=2.13.4
 pzversion=42
 poster=poster.png
