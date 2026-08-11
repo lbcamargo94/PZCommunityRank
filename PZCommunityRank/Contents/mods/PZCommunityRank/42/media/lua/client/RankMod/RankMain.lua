@@ -303,9 +303,12 @@ end
 
 local function isLocalPlayer(player)
     if not player then return false end
-    -- Kahlua lanca RuntimeException ao chamar metodo nil via ':' mesmo dentro de pcall.
-    -- Guard necessario quando o evento passa um ItemContainer em vez de IsoPlayer.
-    if player.isLocalPlayer == nil then return false end
+    -- Kahlua lanca RuntimeException ao chamar via ':' qualquer valor nao-funcao,
+    -- mesmo dentro de pcall (a excecao e Java, nao Lua).
+    -- Checar apenas ~= nil e insuficiente: campos Java booleanos (ex: false) passam
+    -- no teste nil mas crasham ao ser chamados via ':'. type() == "function" garante
+    -- que o campo e um metodo Java chamavel antes de qualquer invocacao.
+    if type(player.isLocalPlayer) ~= "function" then return false end
     local ok, result = pcall(function() return player:isLocalPlayer() end)
     if ok and result == true  then return true  end
     if ok and result == false then return false end
