@@ -1,7 +1,7 @@
 -- ============================================================
 --  RankCode.lua - Gerador do codigo de submissao
 --
---  Formato PZRX7 (v2.13+, 35 campos):
+--  Formato PZRX9 (v2.15+, 45 campos):
 --  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|
 --      <traits>|<motivo>|<ts>|<modver>|
 --      <animals_killed>|<fish_caught>|<crops_harvested>|
@@ -24,6 +24,7 @@
 --    PZRX3: 17 campos
 --    PZRX4: 21 campos
 --    PZRX5: 22 campos
+--    PZRX6-PZRX8: ate 44 campos (sem death_cause)
 --
 --  IMPORTANTE: isto e OFUSCACAO, nao criptografia forte - o mod e
 --  Lua aberto (Workshop) e o site e JS aberto no navegador, entao
@@ -38,7 +39,7 @@ require "RankMod/RankLog"
 
 RankCode = {}
 
-local MOD_VERSION = "2.13.6"
+local MOD_VERSION = "2.15.0"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -158,19 +159,21 @@ local function unixTimestamp()
 end
 
 -- Gera o codigo (com prefixo de formato) a partir dos dados coletados.
--- PZRX8 (v2.13+): 44 campos —
+-- PZRX9 (v2.15+): 45 campos —
 --   nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|
 --   animals_killed|fish_caught|crops_harvested|items_crafted|houses_looted|hours_without_sleep|
 --   trees_cut|books_read|structures_built|crops_planted|spiffo_visited|
 --   eggs_collected|milk_produced|stone_structures|ceramic_items|forged_weapons|km_driven|
 --   cities_visited|military_visited|meals_cooked|water_collected|materials_crafted|animal_tracks|
 --   weapons_crafted|furniture_crafted|clothes_crafted|cheese_produced|doors_opened|
---   sleep_locations|basements_explored|stations_used|animal_species|days_no_canned
--- Campos 12-44 sao inteiros; 0 quando nao disponivel nesta versao do PZ.
+--   sleep_locations|basements_explored|stations_used|animal_species|days_no_canned|
+--   death_cause
+-- Campos 12-44 sao inteiros; campo 45 (death_cause) e string; 0/vazio quando nao disponivel.
 -- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
 -- Campo traits: IDs separados por virgula (ex: "Athletic,Lucky,Smoker")
 -- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
 -- Campo ts: Unix timestamp em segundos — detecta replay de codigos antigos
+-- Campo death_cause: resultado de getGameTime():getDeathString(player); vazio em syncs periodicos
 function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local traitsStr  = table.concat(entry.traits or {}, ",")
@@ -181,8 +184,9 @@ function RankCode.generate(entry)
     local motivo     = (entry.sandbox_ok == false) and (entry.disqualification_reason or "sandbox") or ""
     local ts         = unixTimestamp()
     local ext        = entry.extended or {}
+    local deathCause = ((entry.death_cause or "")):gsub("|", " ")
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%s",
         charName,
         profession,
         entry.kills or 0,
@@ -226,16 +230,17 @@ function RankCode.generate(entry)
         ext.basements_explored  or 0,
         ext.stations_used       or 0,
         ext.animal_species      or 0,
-        ext.days_no_canned      or 0
+        ext.days_no_canned      or 0,
+        deathCause
     )
 
-    return "PZRX8:" .. obfuscate(plain)
+    return "PZRX9:" .. obfuscate(plain)
 end
 
 -- Valida se uma string e um codigo PZRX1-PZRX8.
 function RankCode.isValid(code)
     if not code or type(code) ~= "string" then return false end
-    local prefix, encoded = code:match("^(PZRX[12345678]:)(.+)$")
+    local prefix, encoded = code:match("^(PZRX[123456789]:)(.+)$")
     if not prefix then return false end
 
     local ok, plain = pcall(deobfuscate, encoded)

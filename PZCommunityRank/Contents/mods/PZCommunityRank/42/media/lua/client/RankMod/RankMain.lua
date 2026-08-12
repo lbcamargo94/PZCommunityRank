@@ -190,7 +190,7 @@ end
 
 -- Coleta dados, gera codigo, salva arquivo e abre a UI de resultado.
 -- O Companion (app externo) faz o sync via arquivo - nenhuma rede aqui.
-local function triggerRank(player, playerIndex, isDead)
+local function triggerRank(player, playerIndex, isDead, deathCause)
     playerIndex = playerIndex or 0
 
     if RankMain.submitted[playerIndex] then
@@ -205,6 +205,7 @@ local function triggerRank(player, playerIndex, isDead)
         RankMain.submitted[playerIndex] = false
         return
     end
+    entry.death_cause = (deathCause and deathCause ~= "") and deathCause or ""
 
     -- Checa debug antes de qualquer outra validacao — garante captura mesmo que o
     -- tick periodico nao tenha disparado ainda (ex: morte nos primeiros 5 minutos).
@@ -334,6 +335,17 @@ local function onPlayerDeath(player, playerIndex)
     RankLog.info("OnPlayerDeath: jogador local morreu, index=" .. playerIndex)
     RankMain.submitted[playerIndex] = false
 
+    -- Captura a causa da morte antes de qualquer cleanup (ISPostDeathUI usa o mesmo método)
+    local capturedCause = ""
+    pcall(function()
+        local s = getGameTime():getDeathString(player)
+        if s then
+            local str = tostring(s):gsub("|", " "):gsub("^%s+", ""):gsub("%s+$", "")
+            if str ~= "" and str ~= "nil" then capturedCause = str end
+        end
+    end)
+    RankLog.info("OnPlayerDeath: causa da morte = " .. capturedCause)
+
     -- Registra posição de morte para heatmap antes da tela de morte
     pcall(recordHeatmapDeath, player)
 
@@ -348,14 +360,14 @@ local function onPlayerDeath(player, playerIndex)
         frames = frames + 1
         if frames >= 60 then
             pcall(function() Events.OnTick.Remove(waitTick) end)
-            triggerRank(capturedPlayer, capturedIndex, true)
+            triggerRank(capturedPlayer, capturedIndex, true, capturedCause)
         end
     end
 
     local ok = pcall(function() Events.OnTick.Add(waitTick) end)
     if not ok then
         RankLog.warn("OnPlayerDeath: Events.OnTick indisponivel, chamando direto.")
-        triggerRank(capturedPlayer, capturedIndex, true)
+        triggerRank(capturedPlayer, capturedIndex, true, capturedCause)
     end
 end
 
@@ -1633,4 +1645,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.14.2")
+RankLog.info("Mod carregado - B42.20 | v2.15.0")
