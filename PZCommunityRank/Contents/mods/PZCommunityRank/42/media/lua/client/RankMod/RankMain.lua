@@ -6,6 +6,7 @@ require "RankMod/RankLog"
 require "RankMod/RankData"
 require "RankMod/RankCode"
 require "RankMod/RankUI"
+require "RankMod/RankListUI"
 require "RankMod/RankFile"
 require "RankMod/RankSandbox"
 require "RankMod/RankGameMode"
@@ -14,6 +15,9 @@ require "RankMod/RankModCheck"
 
 RankMain = {}
 RankMain.submitted = {}
+
+-- Referência ao botão lateral — criado em OnGameStart, destruído em OnExitToMenu.
+local _sidePanel = nil
 
 -- True durante os primeiros ~120 ticks apos OnGameStart para ignorar
 -- OnPlayerDeath disparado ao carregar um save com personagem ja morto.
@@ -458,6 +462,14 @@ local function onGameStart()
             if ok and player and isLocalPlayer(player) then
                 safeSilentUpdate(player, 0)
             end
+
+            -- Cria botao lateral persistente para abrir a tela de rank.
+            pcall(function()
+                if _sidePanel and not _sidePanel:isRemoved() then
+                    _sidePanel:removeFromUIManager()
+                end
+                _sidePanel = RankSidePanel.show(0)
+            end)
         end
     end
     pcall(function() Events.OnTick.Add(clearStartup) end)
@@ -1621,4 +1633,14 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.13.4")
+-- Remove botao lateral ao sair para o menu principal.
+pcall(function()
+    Events.OnExitToMainMenu.Add(function()
+        if _sidePanel and not _sidePanel:isRemoved() then
+            pcall(function() _sidePanel:removeFromUIManager() end)
+        end
+        _sidePanel = nil
+    end)
+end)
+
+RankLog.info("Mod carregado - B42.20 | v2.14.0")
