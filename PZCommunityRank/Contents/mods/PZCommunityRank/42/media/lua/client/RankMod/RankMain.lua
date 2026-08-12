@@ -1633,14 +1633,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
--- Remove botao lateral ao sair para o menu principal.
-pcall(function()
-    Events.OnExitToMainMenu.Add(function()
-        if _sidePanel and not _sidePanel:isRemoved() then
-            pcall(function() _sidePanel:removeFromUIManager() end)
-        end
-        _sidePanel = nil
-    end)
-end)
-
-RankLog.info("Mod carregado - B42.20 | v2.14.0")
+RankLog.info("Mod carregado - B42.20 | v2.14.1")
