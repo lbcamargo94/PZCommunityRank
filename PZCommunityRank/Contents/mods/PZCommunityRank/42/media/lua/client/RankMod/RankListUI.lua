@@ -122,6 +122,7 @@ function RankListUI:initialise()
     local panel = self
     self.list.doDrawItem = function(listbox, y2, item, alt)
         panel:drawRow(listbox, y2, item, alt)
+        return y2 + listbox.itemHeight
     end
     self:addChild(self.list)
 
