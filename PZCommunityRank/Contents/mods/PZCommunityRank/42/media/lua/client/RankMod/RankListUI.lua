@@ -37,7 +37,8 @@ local function readRankFile()
     local entries    = {}
     local fileFound  = false
     pcall(function()
-        local r = getFileReader("pz_rank/pz_rank_rank.log", false)
+        -- true = Zomboid/Lua/ (onde o Companion escreve); false buscaria no dir do mod
+        local r = getFileReader("pz_rank/pz_rank_rank.log", true)
         if not r then return end
         fileFound = true
         local line = r:readLine()
