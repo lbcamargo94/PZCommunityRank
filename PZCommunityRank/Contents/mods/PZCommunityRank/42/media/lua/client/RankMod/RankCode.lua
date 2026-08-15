@@ -1,22 +1,18 @@
 -- ============================================================
 --  RankCode.lua - Gerador do codigo de submissao
 --
---  Formato PZRX9 (v2.15+, 45 campos):
+--  Formato PZRX9 slim (v2.16+, 12 campos):
 --  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|
---      <traits>|<motivo>|<ts>|<modver>|
---      <animals_killed>|<fish_caught>|<crops_harvested>|
---      <items_crafted>|<houses_looted>|<hours_without_sleep>|
---      <trees_cut>|<books_read>|<structures_built>|<crops_planted>|
---      <spiffo_visited>|
---      <eggs_collected>|<milk_produced>|<stone_structures>|
---      <ceramic_items>|<forged_weapons>|<km_driven>|
---      <cities_visited>|<military_visited>|<meals_cooked>|
---      <water_collected>|<materials_crafted>|<animal_tracks>
+--      <traits>|<motivo>|<ts>|<modver>|<death_cause>
 --
---  <status>:  "morto" ou "vivo"
---  <sandbox>: "ok" ou "invalido"
---  <traits>:  IDs separados por virgula (ex: "Athletic,Lucky,Smoker"); pode ser vazio
---  Campos 13-34: inteiros; 0 se nao disponivel nesta versao do PZ
+--  <status>:     "morto" ou "vivo"
+--  <sandbox>:    "ok" ou "invalido"
+--  <traits>:     IDs separados por virgula (ex: "Athletic,Lucky,Smoker"); pode ser vazio
+--  <death_cause>: string; vazio em syncs periodicos (so preenchido na morte)
+--
+--  Stats de conquistas (33 campos) agora ficam em arquivo separado:
+--    pz_rank_stats_<personagem>.log  (gravado pelo RankFile.saveStats)
+--  Nao sao enviados ao backend — consumo local pelo Companion apenas.
 --
 --  Formatos legados aceitos pelo backend (retrocompat.):
 --    PZRX1: 6 campos (sem status/sandbox/traits)
@@ -25,6 +21,7 @@
 --    PZRX4: 21 campos
 --    PZRX5: 22 campos
 --    PZRX6-PZRX8: ate 44 campos (sem death_cause)
+--    PZRX9 v2.15: 45 campos (legado — substituido pelo slim acima)
 --
 --  IMPORTANTE: isto e OFUSCACAO, nao criptografia forte - o mod e
 --  Lua aberto (Workshop) e o site e JS aberto no navegador, entao
@@ -39,7 +36,7 @@ require "RankMod/RankLog"
 
 RankCode = {}
 
-local MOD_VERSION = "2.15.1"
+local MOD_VERSION = "2.16.1"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -158,22 +155,13 @@ local function unixTimestamp()
     return 0
 end
 
--- Gera o codigo (com prefixo de formato) a partir dos dados coletados.
--- PZRX9 (v2.15+): 45 campos —
---   nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|
---   animals_killed|fish_caught|crops_harvested|items_crafted|houses_looted|hours_without_sleep|
---   trees_cut|books_read|structures_built|crops_planted|spiffo_visited|
---   eggs_collected|milk_produced|stone_structures|ceramic_items|forged_weapons|km_driven|
---   cities_visited|military_visited|meals_cooked|water_collected|materials_crafted|animal_tracks|
---   weapons_crafted|furniture_crafted|clothes_crafted|cheese_produced|doors_opened|
---   sleep_locations|basements_explored|stations_used|animal_species|days_no_canned|
---   death_cause
--- Campos 12-44 sao inteiros; campo 45 (death_cause) e string; 0/vazio quando nao disponivel.
+-- Gera o codigo slim (12 campos) a partir dos dados coletados.
+-- PZRX9 slim (v2.16+): nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|death_cause
+-- Stats de conquistas ficam em pz_rank_stats_<char>.log (gravado pelo RankFile.saveStats).
 -- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
--- Campo traits: IDs separados por virgula (ex: "Athletic,Lucky,Smoker")
 -- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
 -- Campo ts: Unix timestamp em segundos — detecta replay de codigos antigos
--- Campo death_cause: resultado de getGameTime():getDeathString(player); vazio em syncs periodicos
+-- Campo death_cause: string; vazio em syncs periodicos (so preenchido na morte)
 function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local traitsStr  = table.concat(entry.traits or {}, ",")
@@ -183,10 +171,9 @@ function RankCode.generate(entry)
     local sandbox    = (entry.sandbox_ok == false) and "invalido" or "ok"
     local motivo     = (entry.sandbox_ok == false) and (entry.disqualification_reason or "sandbox") or ""
     local ts         = unixTimestamp()
-    local ext        = entry.extended or {}
     local deathCause = ((entry.death_cause or "")):gsub("|", " ")
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%s",
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%s",
         charName,
         profession,
         entry.kills or 0,
@@ -198,39 +185,6 @@ function RankCode.generate(entry)
         motivo,
         ts,
         MOD_VERSION,
-        ext.animals_killed      or 0,
-        ext.fish_caught         or 0,
-        ext.crops_harvested     or 0,
-        ext.items_crafted       or 0,
-        ext.houses_looted       or 0,
-        ext.hours_without_sleep or 0,
-        ext.trees_cut           or 0,
-        ext.books_read          or 0,
-        ext.structures_built    or 0,
-        ext.crops_planted       or 0,
-        ext.spiffo_visited      or 0,
-        ext.eggs_collected      or 0,
-        ext.milk_produced       or 0,
-        ext.stone_structures    or 0,
-        ext.ceramic_items       or 0,
-        ext.forged_weapons      or 0,
-        ext.km_driven           or 0,
-        ext.cities_visited      or 0,
-        ext.military_visited    or 0,
-        ext.meals_cooked        or 0,
-        ext.water_collected     or 0,
-        ext.materials_crafted   or 0,
-        ext.animal_tracks       or 0,
-        ext.weapons_crafted     or 0,
-        ext.furniture_crafted   or 0,
-        ext.clothes_crafted     or 0,
-        ext.cheese_produced     or 0,
-        ext.doors_opened        or 0,
-        ext.sleep_locations     or 0,
-        ext.basements_explored  or 0,
-        ext.stations_used       or 0,
-        ext.animal_species      or 0,
-        ext.days_no_canned      or 0,
         deathCause
     )
 

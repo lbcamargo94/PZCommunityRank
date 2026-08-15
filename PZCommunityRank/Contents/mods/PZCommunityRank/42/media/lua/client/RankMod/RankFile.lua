@@ -84,6 +84,125 @@ function RankFile.save(entry, code)
     return ok
 end
 
+-- Exporta stats de conquistas para pz_rank_stats_<charname>.log.
+-- Lido pelo Companion localmente — NAO e enviado ao backend.
+-- Conteudo JSON com os 33 campos de conquistas (PZRX3-8).
+-- .log porque B42.20 bloqueia .json no getFileWriter.
+function RankFile.saveStats(entry)
+    local safeName = sanitizeName(entry.character_name or "Sobrevivente")
+    local ext      = entry.extended or {}
+    local filePath = "pz_rank/pz_rank_stats_" .. safeName .. ".log"
+
+    local json = string.format(
+        '{"type":"rank_stats","version":"1.0","character":"%s","stats":{' ..
+        '"animals_killed":%d,"fish_caught":%d,"crops_harvested":%d,' ..
+        '"items_crafted":%d,"houses_looted":%d,"hours_without_sleep":%d,' ..
+        '"trees_cut":%d,"books_read":%d,"structures_built":%d,"crops_planted":%d,' ..
+        '"spiffo_visited":%d,' ..
+        '"eggs_collected":%d,"milk_produced":%d,"stone_structures":%d,' ..
+        '"ceramic_items":%d,"forged_weapons":%d,"km_driven":%d,' ..
+        '"cities_visited":%d,"military_visited":%d,"meals_cooked":%d,' ..
+        '"water_collected":%d,"materials_crafted":%d,"animal_tracks":%d,' ..
+        '"weapons_crafted":%d,' ..
+        '"furniture_crafted":%d,"clothes_crafted":%d,"cheese_produced":%d,' ..
+        '"doors_opened":%d,"sleep_locations":%d,"basements_explored":%d,' ..
+        '"stations_used":%d,"animal_species":%d,"days_no_canned":%d}}',
+        (entry.character_name or "Sobrevivente"):gsub('"', '\\"'),
+        ext.animals_killed      or 0,
+        ext.fish_caught         or 0,
+        ext.crops_harvested     or 0,
+        ext.items_crafted       or 0,
+        ext.houses_looted       or 0,
+        ext.hours_without_sleep or 0,
+        ext.trees_cut           or 0,
+        ext.books_read          or 0,
+        ext.structures_built    or 0,
+        ext.crops_planted       or 0,
+        ext.spiffo_visited      or 0,
+        ext.eggs_collected      or 0,
+        ext.milk_produced       or 0,
+        ext.stone_structures    or 0,
+        ext.ceramic_items       or 0,
+        ext.forged_weapons      or 0,
+        ext.km_driven           or 0,
+        ext.cities_visited      or 0,
+        ext.military_visited    or 0,
+        ext.meals_cooked        or 0,
+        ext.water_collected     or 0,
+        ext.materials_crafted   or 0,
+        ext.animal_tracks       or 0,
+        ext.weapons_crafted     or 0,
+        ext.furniture_crafted   or 0,
+        ext.clothes_crafted     or 0,
+        ext.cheese_produced     or 0,
+        ext.doors_opened        or 0,
+        ext.sleep_locations     or 0,
+        ext.basements_explored  or 0,
+        ext.stations_used       or 0,
+        ext.animal_species      or 0,
+        ext.days_no_canned      or 0
+    )
+
+    local ok, err = pcall(function()
+        local w = getFileWriter(filePath, true, false)
+        if not w then error("getFileWriter retornou nil") end
+        w:write(json)
+        w:close()
+    end)
+
+    if ok then
+        RankLog.info("Stats salvas: " .. filePath)
+    else
+        RankLog.error("Falha ao salvar stats " .. filePath .. ": " .. tostring(err))
+    end
+    return ok
+end
+
+-- Exporta manifesto de personagens para pz_rank_saves.json.
+-- Lido pelo Companion para popular a tela "Meus Saves".
+-- Faz upsert do personagem atual; o Companion acumula entradas por char_name.
+function RankFile.saveManifest(entry)
+    local safeName = sanitizeName(entry.character_name or "Sobrevivente")
+    local status   = entry.is_dead and "dead" or "alive"
+    local ts       = math.floor(os.time and os.time() or 0)
+
+    local json = string.format(
+        '{"type":"rank_saves","version":"1.0","characters":[{"name":"%s","status":"%s","kills":%d,"updated_at":%d}]}',
+        (entry.character_name or "Sobrevivente"):gsub('"', '\\"'),
+        status,
+        entry.kills or 0,
+        ts
+    )
+
+    -- .json e bloqueado em B42.20 — salva como .log mas o Companion espera .json
+    -- Para manter compat com ambas as versoes, tenta .json e cai para .log
+    local filePath = "pz_rank/pz_rank_saves.json"
+    local ok = pcall(function()
+        local w = getFileWriter(filePath, true, false)
+        if not w then error("getFileWriter retornou nil") end
+        w:write(json)
+        w:close()
+    end)
+
+    if not ok then
+        -- B42.20+: .json bloqueado, usa extensao .log
+        filePath = "pz_rank/pz_rank_saves.log"
+        local ok2, err2 = pcall(function()
+            local w = getFileWriter(filePath, true, false)
+            if not w then error("getFileWriter retornou nil") end
+            w:write(json)
+            w:close()
+        end)
+        if ok2 then
+            RankLog.info("Manifesto salvo (fallback .log): " .. filePath)
+        else
+            RankLog.error("Falha ao salvar manifesto: " .. tostring(err2))
+        end
+    else
+        RankLog.info("Manifesto salvo: " .. filePath)
+    end
+end
+
 -- Exporta delta de heatmap para pz_rank_heatmap_<charname>.log.
 -- Lido pelo Companion e enviado como heatmap_delta no POST de sync.
 function RankFile.saveHeatmap(player, charName)

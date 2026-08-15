@@ -242,6 +242,8 @@ local function triggerRank(player, playerIndex, isDead, deathCause)
 
     RankFile.save(entry, code)
     pcall(function() RankFile.saveHeatmap(player, entry.character_name) end)
+    pcall(function() RankFile.saveStats(entry) end)
+    pcall(function() RankFile.saveManifest(entry) end)
     -- Exporta sandbox em arquivo separado - independente do PZRX2
     pcall(function() RankSandboxExport.export(entry.character_name) end)
     RankSubmitUI.open(entry, code, playerIndex)
@@ -286,6 +288,8 @@ local function silentUpdate(player, playerIndex)
 
     RankFile.save(entry, code)
     pcall(function() RankFile.saveHeatmap(player, entry.character_name) end)
+    pcall(function() RankFile.saveStats(entry) end)
+    pcall(function() RankFile.saveManifest(entry) end)
     pcall(function() RankSandboxExport.export(entry.character_name) end)
 
     -- Registra hora atual para detectar gap de jogo sem o mod na proxima sessao
@@ -974,20 +978,20 @@ if not _seedPatched then
     end, "Culturas plantadas (evento)")
 end
 
--- Ovos coletados (B42: coleta manual de ninhos)
+-- Ovos coletados (B42.20: ISHutchGrabEgg substituiu ISCollectEgg)
 local _eggPatched = false
 pcall(function()
-    require "TimedActions/Animals/ISCollectEgg"
-    if ISCollectEgg and ISCollectEgg.perform and not ISCollectEgg._pzRankPatched then
-        local origEgg = ISCollectEgg.perform
-        ISCollectEgg.perform = function(self)
+    require "TimedActions/Animals/ISHutchGrabEgg"
+    if ISHutchGrabEgg and ISHutchGrabEgg.perform and not ISHutchGrabEgg._pzRankPatched then
+        local origEgg = ISHutchGrabEgg.perform
+        ISHutchGrabEgg.perform = function(self)
             local result = origEgg(self)
-            if result ~= false and self and self.character and isLocalPlayer(self.character) then
+            if self and self.character and isLocalPlayer(self.character) then
                 incModCounter("PZCommunityRank_EggsCollected")
             end
             return result
         end
-        ISCollectEgg._pzRankPatched = true
+        ISHutchGrabEgg._pzRankPatched = true
         _eggPatched = true
         RankLog.info("Ovos coletados: patch instalado.")
     end
@@ -1458,15 +1462,15 @@ pcall(function()
     end
 end)
 
--- Especies de animais criados/alimentados
+-- Especies de animais criados/alimentados (B42.20: ISFeedAnimalFromHand substituiu ISFeedAnimal)
 local _animalSpeciesPatched = false
 pcall(function()
-    require "TimedActions/Animals/ISFeedAnimal"
-    if ISFeedAnimal and ISFeedAnimal.perform and not ISFeedAnimal._pzRankPatched then
-        local orig = ISFeedAnimal.perform
-        ISFeedAnimal.perform = function(self)
+    require "TimedActions/Animals/ISFeedAnimalFromHand"
+    if ISFeedAnimalFromHand and ISFeedAnimalFromHand.complete and not ISFeedAnimalFromHand._pzRankPatched then
+        local orig = ISFeedAnimalFromHand.complete
+        ISFeedAnimalFromHand.complete = function(self)
             local result = orig(self)
-            if result ~= false and self and self.character and isLocalPlayer(self.character) and self.animal then
+            if self and self.character and isLocalPlayer(self.character) and self.animal then
                 pcall(function()
                     local animal = self.animal
                     local speciesOk, species = pcall(function()
@@ -1492,7 +1496,7 @@ pcall(function()
             end
             return result
         end
-        ISFeedAnimal._pzRankPatched = true
+        ISFeedAnimalFromHand._pzRankPatched = true
         _animalSpeciesPatched = true
         RankLog.info("Especies de animais: patch instalado.")
     end
@@ -1645,4 +1649,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.15.1")
+RankLog.info("Mod carregado - B42.20 | v2.16.1")
