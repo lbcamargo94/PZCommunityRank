@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents\mods\PZCommunityRank"
-	"changenote"		"v2.13.6 — corrige versao do mod (reportava 2.13.4 ao backend), corrige crash isLocalPlayer no modo solo B42.20"
+	"changenote"		"v2.16.0"
 }
