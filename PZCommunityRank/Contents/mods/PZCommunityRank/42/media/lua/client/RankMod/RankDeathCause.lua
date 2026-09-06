@@ -6,8 +6,6 @@
 --
 -- Ordem de prioridade: causas violentas/instantâneas primeiro, lentas/acumuladas por último.
 
-require "TimedActions/ISDrinkFromBottle"
-
 RankDeathCause = RankDeathCause or {}
 
 -- Black box recorder: velocidade do veículo não sobrevive ao momento da morte.
@@ -20,6 +18,9 @@ RankDeathCause.lastBleach = {}
 local CRASH_DROP_KMH        = 25
 local CRASH_MEMORY_SECONDS  = 30
 local BLEACH_MEMORY_SECONDS = 1800
+
+-- ISDrinkFromBottle pode não existir em todas as builds do B42; carrega de forma segura.
+local _drinkOk = pcall(function() require "TimedActions/ISDrinkFromBottle" end)
 
 local function anyBodyPart(bd, checkFn)
     local parts = bd:getBodyParts()
@@ -43,15 +44,17 @@ local function trackVehicleSpeed(playerObj)
 end
 Events.OnPlayerUpdate.Add(trackVehicleSpeed)
 
-local origDrink = ISDrinkFromBottle.drink
-function ISDrinkFromBottle:drink(food, percentage)
-    local ok, hasBleach = pcall(function()
-        return food and food:getFluidContainer() and food:getFluidContainer():contains(Fluid.Bleach)
-    end)
-    if ok and hasBleach then
-        RankDeathCause.lastBleach[self.character] = getTimestamp()
+if _drinkOk and ISDrinkFromBottle and ISDrinkFromBottle.drink then
+    local origDrink = ISDrinkFromBottle.drink
+    function ISDrinkFromBottle:drink(food, percentage)
+        local ok, hasBleach = pcall(function()
+            return food and food:getFluidContainer() and food:getFluidContainer():contains(Fluid.Bleach)
+        end)
+        if ok and hasBleach then
+            RankDeathCause.lastBleach[self.character] = getTimestamp()
+        end
+        origDrink(self, food, percentage)
     end
-    origDrink(self, food, percentage)
 end
 
 -- ── Detectores individuais ─────────────────────────────────────────────────
