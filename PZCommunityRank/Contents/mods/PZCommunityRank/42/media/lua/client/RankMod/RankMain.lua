@@ -12,6 +12,7 @@ require "RankMod/RankSandbox"
 require "RankMod/RankGameMode"
 require "RankMod/RankSandboxExport"
 require "RankMod/RankModCheck"
+require "RankMod/RankDeathCause"
 
 RankMain = {}
 RankMain.submitted = {}
@@ -339,14 +340,10 @@ local function onPlayerDeath(player, playerIndex)
     RankLog.info("OnPlayerDeath: jogador local morreu, index=" .. playerIndex)
     RankMain.submitted[playerIndex] = false
 
-    -- Captura a causa da morte antes de qualquer cleanup (ISPostDeathUI usa o mesmo método)
+    -- Captura a causa da morte usando detecção estruturada do RankDeathCause.
     local capturedCause = ""
     pcall(function()
-        local s = getGameTime():getDeathString(player)
-        if s then
-            local str = tostring(s):gsub("|", " "):gsub("^%s+", ""):gsub("%s+$", "")
-            if str ~= "" and str ~= "nil" then capturedCause = str end
-        end
+        capturedCause = RankDeathCause.detect(player) or ""
     end)
     RankLog.info("OnPlayerDeath: causa da morte = " .. capturedCause)
 
