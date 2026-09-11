@@ -88,6 +88,19 @@ local function safeGetActiveModList()
     return mods
 end
 
+-- Retorna lista de mod IDs ativos, excluindo IDs internos do engine.
+-- Usado por RankCode para incluir a lista no payload do codigo PZR.
+function RankModCheck.getActiveModIds()
+    local all  = safeGetActiveModList()
+    local out  = {}
+    for _, id in ipairs(all) do
+        if not INTERNAL_IDS[id] then
+            out[#out + 1] = id
+        end
+    end
+    return out
+end
+
 -- Verifica mods ativos contra a whitelist.
 --
 -- Retorna:

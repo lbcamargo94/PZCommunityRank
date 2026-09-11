@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.17.2 - fix: contentfolder correto (Contents/ entrega mods/PZCommunityRank/42/)"
+	"changenote"		"v2.18.0 - feat: lista de mods ativos no payload PZR (campo 13); backend detecta mods bloqueados automaticamente"
 }

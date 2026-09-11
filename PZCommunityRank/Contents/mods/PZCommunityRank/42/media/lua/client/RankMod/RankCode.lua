@@ -1,9 +1,12 @@
 -- ============================================================
 --  RankCode.lua - Gerador do codigo de submissao
 --
---  Formato PZRX9 slim (v2.16+, 12 campos):
+--  Formato PZRX9 slim (v2.16+, 13 campos a partir do v2.18.0):
 --  PZR|<nome>|<profissao>|<kills>|<minutos>|<skills>|<status>|<sandbox>|
---      <traits>|<motivo>|<ts>|<modver>|<death_cause>
+--      <traits>|<motivo>|<ts>|<modver>|<death_cause>|<active_mods>
+--
+--  <active_mods>: IDs dos mods ativos separados por ";" (excl. IDs internos do engine)
+--                 Vazio se nenhum mod externo estiver ativo.
 --
 --  <status>:     "morto" ou "vivo"
 --  <sandbox>:    "ok" ou "invalido"
@@ -33,10 +36,11 @@
 -- ============================================================
 
 require "RankMod/RankLog"
+require "RankMod/RankModCheck"
 
 RankCode = {}
 
-local MOD_VERSION = "2.17.2"
+local MOD_VERSION = "2.18.0"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -155,13 +159,14 @@ local function unixTimestamp()
     return 0
 end
 
--- Gera o codigo slim (12 campos) a partir dos dados coletados.
--- PZRX9 slim (v2.16+): nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|death_cause
+-- Gera o codigo slim (13 campos a partir do v2.18.0) a partir dos dados coletados.
+-- PZRX9 slim: nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|death_cause|active_mods
 -- Stats de conquistas ficam em pz_rank_stats_<char>.log (gravado pelo RankFile.saveStats).
 -- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
 -- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
 -- Campo ts: Unix timestamp em segundos — detecta replay de codigos antigos
 -- Campo death_cause: string; vazio em syncs periodicos (so preenchido na morte)
+-- Campo active_mods: IDs dos mods ativos separados por ";", excluindo IDs internos do engine
 function RankCode.generate(entry)
     local skillsStr  = table.concat(entry.skills or {}, ",")
     local traitsStr  = table.concat(entry.traits or {}, ",")
@@ -173,7 +178,11 @@ function RankCode.generate(entry)
     local ts         = unixTimestamp()
     local deathCause = ((entry.death_cause or "")):gsub("|", " ")
 
-    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%s",
+    -- Coleta mods ativos (sem IDs internos do engine)
+    local modIds    = RankModCheck.getActiveModIds()
+    local modsStr   = table.concat(modIds, ";")
+
+    local plain = string.format("PZR|%s|%s|%d|%d|%s|%s|%s|%s|%s|%d|%s|%s|%s",
         charName,
         profession,
         entry.kills or 0,
@@ -185,7 +194,8 @@ function RankCode.generate(entry)
         motivo,
         ts,
         MOD_VERSION,
-        deathCause
+        deathCause,
+        modsStr
     )
 
     return "PZRX9:" .. obfuscate(plain)
