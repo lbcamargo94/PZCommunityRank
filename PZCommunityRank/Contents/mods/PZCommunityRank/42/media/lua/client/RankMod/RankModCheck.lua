@@ -94,9 +94,12 @@ local function collectJavaList(label, javaList, out, seen)
 end
 
 -- Coleta os mod IDs ativos tentando múltiplas APIs do PZ B42.
--- M1: getActiveMods() global  (funciona no B41; no B42 pode retornar só internos)
--- M2: ModManager:getActiveMods() (acesso direto à classe Java)
--- M3: getCore():getActiveMods() (via Core singleton)
+-- M1: getActiveMods() global  (funciona no B41; no B42 retorna só internos)
+-- M2: ModManager:getActiveMods()
+-- M3: getCore():getActiveMods()
+-- M4: ModManager:getLoadedMods()  (B42: pode incluir mods de workshop)
+-- M5: Iteração via ModInfo (ModManager:getModInfoList / getAllMods)
+-- M6: Leitura direta do arquivo de mods do save (Zomboid/Saves/Survival/<world>/)
 local function safeGetActiveModList()
     local mods = {}
     local seen = {}
@@ -109,7 +112,7 @@ local function safeGetActiveModList()
         RankLog.warn("[M1-global] getActiveMods() excecao: " .. tostring(list1))
     end
 
-    -- M2: ModManager class (B42 pode expor metodo diferente)
+    -- M2: ModManager:getActiveMods()
     pcall(function()
         local mgr = ModManager
         if not mgr then RankLog.warn("[M2-ModManager] classe nao encontrada"); return end
@@ -121,7 +124,7 @@ local function safeGetActiveModList()
         end
     end)
 
-    -- M3: getCore() singleton
+    -- M3: getCore():getActiveMods()
     pcall(function()
         local core = getCore and getCore()
         if not core then RankLog.warn("[M3-Core] getCore() nao disponivel"); return end
@@ -131,6 +134,109 @@ local function safeGetActiveModList()
         else
             RankLog.warn("[M3-Core] falhou: " .. tostring(list3))
         end
+    end)
+
+    -- M4: ModManager:getLoadedMods() — B42 separa "active" (engine) de "loaded" (todos)
+    pcall(function()
+        local mgr = ModManager
+        if not mgr then return end
+        local ok4, list4 = pcall(function() return mgr:getLoadedMods() end)
+        if ok4 and list4 then
+            collectJavaList("[M4-getLoadedMods]", list4, mods, seen)
+        else
+            RankLog.warn("[M4-getLoadedMods] falhou: " .. tostring(list4))
+        end
+    end)
+
+    -- M5: Iteração via objetos ModInfo (getId de cada mod carregado)
+    pcall(function()
+        local mgr = ModManager
+        if not mgr then return end
+
+        local infoList = nil
+        for _, fn in ipairs({
+            function() return mgr:getModInfoList() end,
+            function() return mgr:getAllMods() end,
+            function() return mgr.modInfoList end,
+        }) do
+            local ok, res = pcall(fn)
+            if ok and res then infoList = res; break end
+        end
+
+        if not infoList then
+            RankLog.warn("[M5-ModInfo] nenhuma lista encontrada")
+            return
+        end
+
+        local sz = 0
+        pcall(function() sz = infoList:size() end)
+        RankLog.info("[M5-ModInfo] " .. sz .. " entradas")
+
+        for i = 0, sz - 1 do
+            pcall(function()
+                local entry = infoList:get(i)
+                if not entry then return end
+                local id
+                for _, key in ipairs({"getId", "getModID", "getID"}) do
+                    local ok, val = pcall(function() return entry[key](entry) end)
+                    if ok and val then id = tostring(val); break end
+                end
+                if not id then
+                    for _, field in ipairs({"modID", "id"}) do
+                        local ok, val = pcall(function() return entry[field] end)
+                        if ok and val then id = tostring(val); break end
+                    end
+                end
+                if id then
+                    RankLog.info("  [M5-ModInfo][" .. i .. "] = " .. id)
+                    if not seen[id] then seen[id] = true; mods[#mods + 1] = id end
+                end
+            end)
+        end
+    end)
+
+    -- M6: Lê arquivo de mods da pasta do save atual
+    -- getFileReader com noModDir=true usa Zomboid/Lua/ como raiz;
+    -- ../../Saves/Survival/<world>/mods.txt => Zomboid/Saves/Survival/<world>/mods.txt
+    pcall(function()
+        local world = getWorld and getWorld()
+        if not world then RankLog.warn("[M6-Save] getWorld() indisponivel"); return end
+
+        local worldName
+        pcall(function() worldName = world:getWorldName() end)
+        if not worldName or worldName == "" then
+            RankLog.warn("[M6-Save] getWorldName() falhou")
+            return
+        end
+        RankLog.info("[M6-Save] save = " .. worldName)
+
+        local basePaths = {
+            "../../Saves/Survival/",
+            "../../Saves/Sandbox/",
+        }
+        local fileNames = { "mods.txt", "Mods.txt" }
+
+        for _, base in ipairs(basePaths) do
+            for _, fname in ipairs(fileNames) do
+                local path = base .. worldName .. "/" .. fname
+                local ok, reader = pcall(getFileReader, path, true)
+                if ok and reader then
+                    RankLog.info("[M6-Save] lendo: " .. path)
+                    local line = reader:readLine()
+                    while line do
+                        line = line:match("^%s*(.-)%s*$")
+                        if line ~= "" and not line:match("^#") then
+                            RankLog.info("[M6-Save] mod = " .. line)
+                            if not seen[line] then seen[line] = true; mods[#mods + 1] = line end
+                        end
+                        line = reader:readLine()
+                    end
+                    reader:close()
+                    return
+                end
+            end
+        end
+        RankLog.warn("[M6-Save] arquivo mods.txt nao encontrado no save")
     end)
 
     RankLog.info("safeGetActiveModList: total unico = " .. #mods)
