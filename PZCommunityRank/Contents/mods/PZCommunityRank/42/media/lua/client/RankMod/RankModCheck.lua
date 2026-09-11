@@ -75,13 +75,25 @@ end
 local function safeGetActiveModList()
     local mods = {}
     local ok, javaList = pcall(getActiveMods)
-    if not ok or not javaList then return mods end
+    if not ok then
+        RankLog.warn("safeGetActiveModList: getActiveMods() falhou - " .. tostring(javaList))
+        return mods
+    end
+    if not javaList then
+        RankLog.warn("safeGetActiveModList: getActiveMods() retornou nil")
+        return mods
+    end
+    local sz = 0
     pcall(function()
-        local sz = javaList:size()
+        sz = javaList:size()
+        RankLog.info("safeGetActiveModList: getActiveMods() retornou " .. sz .. " mod(s)")
         for i = 0, sz - 1 do
             pcall(function()
                 local id = javaList:get(i)
-                if id then mods[#mods + 1] = tostring(id) end
+                if id then
+                    RankLog.info("  mod[" .. i .. "] = " .. tostring(id))
+                    mods[#mods + 1] = tostring(id)
+                end
             end)
         end
     end)
@@ -98,6 +110,7 @@ function RankModCheck.getActiveModIds()
             out[#out + 1] = id
         end
     end
+    RankLog.info("getActiveModIds: " .. #out .. " mod(s) externos (total bruto: " .. #all .. ")")
     return out
 end
 
