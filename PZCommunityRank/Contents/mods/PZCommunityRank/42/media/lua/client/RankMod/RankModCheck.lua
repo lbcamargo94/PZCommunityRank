@@ -71,32 +71,69 @@ local function readWhitelist()
     return { allowed = allowed, required = required }
 end
 
--- Coleta os mod IDs ativos via API Java do PZ (getActiveMods() global).
-local function safeGetActiveModList()
-    local mods = {}
-    local ok, javaList = pcall(getActiveMods)
-    if not ok then
-        RankLog.warn("safeGetActiveModList: getActiveMods() falhou - " .. tostring(javaList))
-        return mods
-    end
+-- Itera um ArrayList<String> Java e acrescenta em `out`, sem duplicatas.
+local function collectJavaList(label, javaList, out, seen)
     if not javaList then
-        RankLog.warn("safeGetActiveModList: getActiveMods() retornou nil")
-        return mods
+        RankLog.warn(label .. " retornou nil")
+        return
     end
-    local sz = 0
     pcall(function()
-        sz = javaList:size()
-        RankLog.info("safeGetActiveModList: getActiveMods() retornou " .. sz .. " mod(s)")
+        local sz = javaList:size()
+        RankLog.info(label .. " retornou " .. sz .. " mod(s)")
         for i = 0, sz - 1 do
             pcall(function()
                 local id = javaList:get(i)
                 if id then
-                    RankLog.info("  mod[" .. i .. "] = " .. tostring(id))
-                    mods[#mods + 1] = tostring(id)
+                    local s = tostring(id)
+                    RankLog.info("  " .. label .. "[" .. i .. "] = " .. s)
+                    if not seen[s] then seen[s] = true; out[#out + 1] = s end
                 end
             end)
         end
     end)
+end
+
+-- Coleta os mod IDs ativos tentando múltiplas APIs do PZ B42.
+-- M1: getActiveMods() global  (funciona no B41; no B42 pode retornar só internos)
+-- M2: ModManager:getActiveMods() (acesso direto à classe Java)
+-- M3: getCore():getActiveMods() (via Core singleton)
+local function safeGetActiveModList()
+    local mods = {}
+    local seen = {}
+
+    -- M1: global getActiveMods()
+    local ok1, list1 = pcall(getActiveMods)
+    if ok1 then
+        collectJavaList("[M1-global]", list1, mods, seen)
+    else
+        RankLog.warn("[M1-global] getActiveMods() excecao: " .. tostring(list1))
+    end
+
+    -- M2: ModManager class (B42 pode expor metodo diferente)
+    pcall(function()
+        local mgr = ModManager
+        if not mgr then RankLog.warn("[M2-ModManager] classe nao encontrada"); return end
+        local ok2, list2 = pcall(function() return mgr:getActiveMods() end)
+        if ok2 then
+            collectJavaList("[M2-ModManager]", list2, mods, seen)
+        else
+            RankLog.warn("[M2-ModManager] falhou: " .. tostring(list2))
+        end
+    end)
+
+    -- M3: getCore() singleton
+    pcall(function()
+        local core = getCore and getCore()
+        if not core then RankLog.warn("[M3-Core] getCore() nao disponivel"); return end
+        local ok3, list3 = pcall(function() return core:getActiveMods() end)
+        if ok3 then
+            collectJavaList("[M3-Core]", list3, mods, seen)
+        else
+            RankLog.warn("[M3-Core] falhou: " .. tostring(list3))
+        end
+    end)
+
+    RankLog.info("safeGetActiveModList: total unico = " .. #mods)
     return mods
 end
 

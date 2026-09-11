@@ -40,7 +40,7 @@ require "RankMod/RankModCheck"
 
 RankCode = {}
 
-local MOD_VERSION = "2.18.1"
+local MOD_VERSION = "2.18.2"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 

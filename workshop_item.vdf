@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.18.1 - diagnostico: log de mods ativos no PZRank_log.txt para investigacao"
+	"changenote"		"v2.18.2 - diagnostico: testa 3 APIs do B42 para capturar mods externos (M1/M2/M3 no log)"
 }
