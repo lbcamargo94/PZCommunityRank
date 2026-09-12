@@ -61,6 +61,16 @@ local KILLS_PER_SYNC  = 5    -- dispara sync a cada 5 kills
 -- Threshold generoso (1h) para cobrir crashes/reinicializacoes sem falso positivo.
 local GAP_HOURS_THRESHOLD = 1.0
 
+-- Caches in-memory para sets de IDs unicos: evita O(n) string:find() a cada evento.
+-- Populados a partir do ModData ao fim do grace period. Resetados em onGameStart.
+local _lootedBldCache     = {}  -- PZCommunityRank_LootedBldSet
+local _sleepLocCache      = {}  -- PZCommunityRank_SleepLocSet
+local _spiffoCache        = {}  -- PZCommunityRank_SpiffoSet
+local _basementCache      = {}  -- PZCommunityRank_BasementSet
+local _animalSpeciesCache = {}  -- PZCommunityRank_AnimalSpeciesSet
+local _stationsCache      = {}  -- PZCommunityRank_StationsSet
+local _heatKillCellsCache = {}  -- PZCommunityRank_HeatKillCells
+
 -- Verifica todos os valores do preset completo. Se houver divergencias:
 --   1. Ativa _sandboxViolationDetected (permanente na sessao).
 --   2. Persiste PZCommunityRank_SandboxViolation no ModData do jogador.
@@ -395,6 +405,13 @@ local function onGameStart()
     _sandboxViolationDetected = false
     _debugViolationDetected   = false
     _modViolationDetected     = false
+    _lootedBldCache     = {}
+    _sleepLocCache      = {}
+    _spiffoCache        = {}
+    _basementCache      = {}
+    _animalSpeciesCache = {}
+    _stationsCache      = {}
+    _heatKillCellsCache = {}
     RankLog.info("OnGameStart: submissoes resetadas.")
 
     -- Grace period: bloqueia OnPlayerDeath nos primeiros 120 ticks para evitar
@@ -489,6 +506,28 @@ local function onGameStart()
                 safeSilentUpdate(player, 0)
             end
 
+            -- Popula caches in-memory a partir do ModData (O(1) lookup durante a sessao).
+            pcall(function()
+                local p2 = getPlayer()
+                if not p2 then return end
+                local mdOk, md = pcall(function() return p2:getModData() end)
+                if not mdOk or not md then return end
+                local function initCache(setKey, cache)
+                    local s = md[setKey]
+                    if type(s) == "string" then
+                        s:gsub("|([^|]+)|", function(id) cache[id] = true end)
+                    end
+                end
+                initCache("PZCommunityRank_LootedBldSet",     _lootedBldCache)
+                initCache("PZCommunityRank_SleepLocSet",      _sleepLocCache)
+                initCache("PZCommunityRank_SpiffoSet",        _spiffoCache)
+                initCache("PZCommunityRank_BasementSet",      _basementCache)
+                initCache("PZCommunityRank_AnimalSpeciesSet", _animalSpeciesCache)
+                initCache("PZCommunityRank_StationsSet",      _stationsCache)
+                initCache("PZCommunityRank_HeatKillCells",    _heatKillCellsCache)
+                RankLog.info("OnGameStart: caches in-memory populados.")
+            end)
+
             -- Cria botao lateral persistente para abrir a tela de rank.
             pcall(function()
                 if _sidePanel then
@@ -560,11 +599,12 @@ local function incHeatmapKill(player)
     if not mdOk or not md then return end
     local key = "PZCommunityRank_HeatKill_" .. gx .. "_" .. gy
     md[key] = (tonumber(md[key]) or 0) + 1
-    -- Mantém índice de células para iteração no RankFile (mesmo padrão do LootedBldSet)
-    local cellTag = "|" .. gx .. "_" .. gy .. "|"
-    local cells   = md["PZCommunityRank_HeatKillCells"] or ""
-    if not cells:find(cellTag, 1, true) then
-        md["PZCommunityRank_HeatKillCells"] = cells .. cellTag
+    -- Mantém índice de células para iteração no RankFile
+    local cellId  = gx .. "_" .. gy
+    local cellTag = "|" .. cellId .. "|"
+    if not _heatKillCellsCache[cellId] then
+        _heatKillCellsCache[cellId] = true
+        md["PZCommunityRank_HeatKillCells"] = (md["PZCommunityRank_HeatKillCells"] or "") .. cellTag
     end
 end
 
@@ -643,8 +683,9 @@ local _countedAnimals = {}
 local ANIMAL_TRACK_TICKS = 18000 -- abandona referencias antigas apos ~5 min
 
 local function recordAnimalKill(animal)
-    if not animal or _countedAnimals[animal] then return end
-    _countedAnimals[animal] = true
+    local animalKey = animal and tostring(animal)
+    if not animalKey or _countedAnimals[animalKey] then return end
+    _countedAnimals[animalKey] = true
     incModCounter("PZCommunityRank_AnimalsKilled")
     RankLog.info("Animal abatido contabilizado.")
 end
@@ -652,7 +693,8 @@ end
 local function trackAnimalHit(owner, weapon, hitObject)
     if not owner or not isLocalPlayer(owner) then return end
     if not hitObject or not instanceof(hitObject, "IsoAnimal") then return end
-    if _countedAnimals[hitObject] then return end
+    local hitKey = tostring(hitObject)
+    if _countedAnimals[hitKey] then return end
 
     for _, tracked in ipairs(_trackedAnimals) do
         if tracked.animal == hitObject then
@@ -709,7 +751,7 @@ addFirstAvailableEvent({ "OnAnimalDead" }, function(animal)
     if not ok or not player then return end
     -- Confirma que foi o jogador local que matou (lastAttacker pode ser nil)
     local attackerOk, attacker = pcall(function() return animal:getAttackedBy() end)
-    if attackerOk and attacker and attacker ~= player then return end
+    if attackerOk and attacker and instanceof(attacker, "IsoGameCharacter") and attacker ~= player then return end
     recordAnimalKill(animal)
 end, "Animais abatidos")
 
@@ -791,11 +833,11 @@ addOptionalEvent("OnContainerUpdate", function(container)
         local mdOk, md = pcall(function() return player:getModData() end)
         if not mdOk or not md then return end
         local setKey = "PZCommunityRank_LootedBldSet"
-        local setStr = md[setKey] or ""
         local tag = "|" .. bldId .. "|"
-        if setStr:find(tag, 1, true) then return end
+        if _lootedBldCache[bldId] then return end
+        _lootedBldCache[bldId] = true
         -- Novo prédio — registra e incrementa
-        md[setKey] = setStr .. tag
+        md[setKey] = (md[setKey] or "") .. tag
         md["PZCommunityRank_HousesLooted"] = (tonumber(md["PZCommunityRank_HousesLooted"]) or 0) + 1
 end)
 
@@ -842,10 +884,11 @@ addFirstAvailableEvent({ "OnPlayerStartSleeping", "OnPlayerSleep" }, function(pl
         if not xOk or not yOk then return end
         local cx = math.floor(x / 20)
         local cy = math.floor(y / 20)
-        local tag = "|" .. cx .. "_" .. cy .. "|"
-        local setStr = md["PZCommunityRank_SleepLocSet"] or ""
-        if not setStr:find(tag, 1, true) then
-            md["PZCommunityRank_SleepLocSet"] = setStr .. tag
+        local sleepId = cx .. "_" .. cy
+        local tag = "|" .. sleepId .. "|"
+        if not _sleepLocCache[sleepId] then
+            _sleepLocCache[sleepId] = true
+            md["PZCommunityRank_SleepLocSet"] = (md["PZCommunityRank_SleepLocSet"] or "") .. tag
             md["PZCommunityRank_SleepLocations"] = (tonumber(md["PZCommunityRank_SleepLocations"]) or 0) + 1
         end
     end)
@@ -881,11 +924,10 @@ local function checkSpiffoVisit()
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
     local setKey = "PZCommunityRank_SpiffoSet"
-    local setStr = md[setKey] or ""
     local tag = "|" .. bldId .. "|"
-    if setStr:find(tag, 1, true) then return end
-
-    md[setKey] = setStr .. tag
+    if _spiffoCache[bldId] then return end
+    _spiffoCache[bldId] = true
+    md[setKey] = (md[setKey] or "") .. tag
     md["PZCommunityRank_SpiffoVisited"] = (tonumber(md["PZCommunityRank_SpiffoVisited"]) or 0) + 1
     RankLog.info("Spiffo visitado! bldId=" .. bldId .. " total=" .. md["PZCommunityRank_SpiffoVisited"])
 end
@@ -1158,12 +1200,12 @@ addFirstAvailableEvent({ "OnCraftRecipeCompleted", "OnCraftResult" }, function(f
         local mdOk, md = pcall(function() return player2:getModData() end)
         if not mdOk or not md then return end
         local setKey = "PZCommunityRank_StationsSet"
-        local setStr = md[setKey] or ""
         local changed = false
         local function addSt(tag)
-            local t = "|" .. tag .. "|"
-            if setStr:find(t, 1, true) then return end
-            setStr = setStr .. t; changed = true
+            if _stationsCache[tag] then return end
+            _stationsCache[tag] = true
+            md[setKey] = (md[setKey] or "") .. "|" .. tag .. "|"
+            changed = true
         end
         if recipeKey:find("wood", 1, true) or recipeKey:find("carpent", 1, true) or
            recipeKey:find("madei", 1, true) or recipeKey:find("marcen", 1, true) then addSt("woodwork") end
@@ -1182,9 +1224,8 @@ addFirstAvailableEvent({ "OnCraftRecipeCompleted", "OnCraftResult" }, function(f
         if recipeKey:find("cook", 1, true) or recipeKey:find("bake", 1, true) or
            recipeKey:find("grill", 1, true) or recipeKey:find("cozi", 1, true) then addSt("cooking") end
         if changed then
-            md[setKey] = setStr
             local cnt = 0
-            setStr:gsub("|[^|]+|", function() cnt = cnt + 1 end)
+            for _ in pairs(_stationsCache) do cnt = cnt + 1 end
             md["PZCommunityRank_StationsUsed"] = cnt
         end
     end)
@@ -1358,9 +1399,9 @@ local function checkBasementVisit()
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
     local tag = "|" .. bldId .. "|"
-    local setStr = md["PZCommunityRank_BasementSet"] or ""
-    if setStr:find(tag, 1, true) then return end
-    md["PZCommunityRank_BasementSet"] = setStr .. tag
+    if _basementCache[bldId] then return end
+    _basementCache[bldId] = true
+    md["PZCommunityRank_BasementSet"] = (md["PZCommunityRank_BasementSet"] or "") .. tag
     md["PZCommunityRank_BasementsExplored"] = (tonumber(md["PZCommunityRank_BasementsExplored"]) or 0) + 1
     RankLog.info("Porao explorado: bldId=" .. bldId)
 end
@@ -1522,10 +1563,11 @@ pcall(function()
                     if not speciesOk or not species or species == "" or species == "nil" then return end
                     local mdOk, md = pcall(function() return self.character:getModData() end)
                     if not mdOk or not md then return end
-                    local tag = "|" .. species:lower() .. "|"
-                    local setStr = md["PZCommunityRank_AnimalSpeciesSet"] or ""
-                    if not setStr:find(tag, 1, true) then
-                        md["PZCommunityRank_AnimalSpeciesSet"] = setStr .. tag
+                    local speciesId = species:lower()
+                    local tag = "|" .. speciesId .. "|"
+                    if not _animalSpeciesCache[speciesId] then
+                        _animalSpeciesCache[speciesId] = true
+                        md["PZCommunityRank_AnimalSpeciesSet"] = (md["PZCommunityRank_AnimalSpeciesSet"] or "") .. tag
                         md["PZCommunityRank_AnimalSpecies"] = (tonumber(md["PZCommunityRank_AnimalSpecies"]) or 0) + 1
                         RankLog.info("Nova especie de animal: " .. species)
                     end
@@ -1550,10 +1592,11 @@ if not _animalSpeciesPatched then
             if not speciesOk or not species or species == "" then return end
             local mdOk, md = pcall(function() return player:getModData() end)
             if not mdOk or not md then return end
-            local tag = "|" .. species:lower() .. "|"
-            local setStr = md["PZCommunityRank_AnimalSpeciesSet"] or ""
-            if not setStr:find(tag, 1, true) then
-                md["PZCommunityRank_AnimalSpeciesSet"] = setStr .. tag
+            local speciesId = species:lower()
+            local tag = "|" .. speciesId .. "|"
+            if not _animalSpeciesCache[speciesId] then
+                _animalSpeciesCache[speciesId] = true
+                md["PZCommunityRank_AnimalSpeciesSet"] = (md["PZCommunityRank_AnimalSpeciesSet"] or "") .. tag
                 md["PZCommunityRank_AnimalSpecies"] = (tonumber(md["PZCommunityRank_AnimalSpecies"]) or 0) + 1
             end
         end)
