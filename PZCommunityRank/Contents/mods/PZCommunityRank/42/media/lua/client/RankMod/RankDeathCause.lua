@@ -25,33 +25,42 @@ local BLEACH_MEMORY_SECONDS = 1800
 -- ISDrinkFromBottle pode não existir em todas as builds do B42; carrega de forma segura.
 local _drinkOk = pcall(function() require "TimedActions/ISDrinkFromBottle" end)
 
--- anyBodyPart: itera partes do corpo Java com pcall completo.
+-- anyBodyPart: itera partes do corpo Java com pcalls individuais.
+-- NOTA: getBodyParts()/size()/get(i) cada um pode lançar RuntimeException
+-- que escapa pcall único em Kahlua — cada chamada precisa de pcall próprio.
 local function anyBodyPart(bd, checkFn)
-    local ok, result = pcall(function()
-        local parts = bd:getBodyParts()
-        for i = 0, parts:size() - 1 do
-            if checkFn(parts:get(i)) then return true end
+    local partsOk, parts = pcall(function() return bd:getBodyParts() end)
+    if not partsOk or not parts then return false end
+    local sizeOk, size = pcall(function() return parts:size() end)
+    if not sizeOk or not size then return false end
+    for i = 0, size - 1 do
+        local ptOk, pt = pcall(function() return parts:get(i) end)
+        if ptOk and pt then
+            local checkOk, found = pcall(checkFn, pt)
+            if checkOk and found then return true end
         end
-        return false
-    end)
-    return ok and result == true
+    end
+    return false
 end
 
 local function trackVehicleSpeed(playerObj)
-    -- Envolvido em pcall: isDead/isSeatedInVehicle/getCurrentSpeedKmHour
-    -- são chamadas Java que podem lançar RuntimeException a qualquer tick.
-    pcall(function()
-        if not playerObj or playerObj:isDead() then return end
-        if not playerObj:isSeatedInVehicle() then return end
-        local vehicle = playerObj:getVehicle()
-        if not vehicle then return end
-        local speed = math.abs(vehicle:getCurrentSpeedKmHour())
-        local prev = RankDeathCause.lastSpeed[playerObj]
-        if prev and (prev - speed) >= CRASH_DROP_KMH then
-            RankDeathCause.lastCrash[playerObj] = { speed = math.floor(speed + 0.5), time = getTimestamp() }
-        end
-        RankDeathCause.lastSpeed[playerObj] = speed
-    end)
+    -- Cada chamada Java tem pcall próprio: isDead/isSeatedInVehicle/getVehicle/
+    -- getCurrentSpeedKmHour podem lançar RuntimeException que escapa pcall único.
+    if not playerObj then return end
+    local deadOk, dead = pcall(function() return playerObj:isDead() end)
+    if not deadOk or dead then return end
+    local seatedOk, seated = pcall(function() return playerObj:isSeatedInVehicle() end)
+    if not seatedOk or not seated then return end
+    local vehOk, vehicle = pcall(function() return playerObj:getVehicle() end)
+    if not vehOk or not vehicle then return end
+    local speedOk, speed = pcall(function() return vehicle:getCurrentSpeedKmHour() end)
+    if not speedOk or speed == nil then return end
+    speed = math.abs(speed)
+    local prev = RankDeathCause.lastSpeed[playerObj]
+    if prev and (prev - speed) >= CRASH_DROP_KMH then
+        RankDeathCause.lastCrash[playerObj] = { speed = math.floor(speed + 0.5), time = getTimestamp() }
+    end
+    RankDeathCause.lastSpeed[playerObj] = speed
 end
 Events.OnPlayerUpdate.Add(trackVehicleSpeed)
 
@@ -60,8 +69,15 @@ if _drinkOk and ISDrinkFromBottle and ISDrinkFromBottle.drink then
     function ISDrinkFromBottle:drink(food, percentage)
         -- self.character pode ser nil se o objeto for criado antes do personagem carregar
         if self.character then
-            local ok, hasBleach = pcall(function()
-                return food and food:getFluidContainer() and food:getFluidContainer():contains(Fluid.Bleach)
+            -- getFluidContainer() não pode ser chamado duas vezes em chain:
+            -- se retornar null Java na segunda chamada, :contains() lança RuntimeException.
+            local ok, hasBleach = false, false
+            pcall(function()
+                if not food then return end
+                local fcOk, fc = pcall(function() return food:getFluidContainer() end)
+                if not fcOk or not fc then return end
+                local cOk, has = pcall(function() return fc:contains(Fluid.Bleach) end)
+                if cOk then ok, hasBleach = true, has == true end
             end)
             if ok and hasBleach then
                 RankDeathCause.lastBleach[self.character] = getTimestamp()

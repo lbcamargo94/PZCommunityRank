@@ -38,11 +38,18 @@ end
 function RankSubmitUI:new(entry, code, playerIndex)
     playerIndex = playerIndex or 0
 
-    -- getPlayerScreenWidth/Height retornam 0 para o slot de jogador morto no B42.19,
-    -- posicionando o painel em coordenadas negativas (fora da tela).
-    -- getCore():getScreenWidth/Height() sempre retorna as dimensoes reais da janela.
-    local screenW = getCore():getScreenWidth()
-    local screenH = getCore():getScreenHeight()
+    -- getPlayerScreenWidth/Height retornam 0 para o slot de jogador morto no B42.19.
+    -- getCore():getScreenWidth/Height() retorna dimensões reais — mas getCore() pode
+    -- retornar null Java; encadear diretamente lança RuntimeException.
+    local screenW, screenH = 800, 600
+    pcall(function()
+        local core = getCore()
+        if not core then return end
+        local wOk, w = pcall(function() return core:getScreenWidth() end)
+        local hOk, h = pcall(function() return core:getScreenHeight() end)
+        if wOk and w then screenW = w end
+        if hOk and h then screenH = h end
+    end)
 
     local x = (screenW / 2) - (W / 2)
     local y = (screenH / 2) - (H / 2)

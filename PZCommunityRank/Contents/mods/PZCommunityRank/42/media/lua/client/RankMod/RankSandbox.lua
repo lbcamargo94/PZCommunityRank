@@ -254,18 +254,24 @@ function RankSandbox.applyRules()
         end
     end
     -- Sincroniza cada valor para o objeto Java SandboxOptions.
-    -- getSandboxOptions():fromLua() nao existe no B42.19; usamos getOptionByName
-    -- + parse/setValue + set, igual ao ISServerSandboxOptionsUI (linha 739).
+    -- getSandboxOptions():getOptionByName() — cadeia: getSandboxOptions() retornando null
+    -- Java faz getOptionByName() lançar RuntimeException que escapa pcall único.
     for _, rule in ipairs(RULES) do
         pcall(function()
-            local opt = getSandboxOptions():getOptionByName(rule.key)
-            if not opt then return end
+            local soOk, so = pcall(function() return getSandboxOptions() end)
+            if not soOk or not so then return end
+            local optOk, opt = pcall(function() return so:getOptionByName(rule.key) end)
+            if not optOk or not opt then return end
             if type(rule.expected) == "boolean" then
-                opt:setValue(rule.expected)
+                pcall(function() opt:setValue(rule.expected) end)
             else
-                opt:parse(tostring(rule.expected))
+                pcall(function() opt:parse(tostring(rule.expected)) end)
             end
-            getSandboxOptions():set(opt:getName(), opt:getValue())
+            local nameOk, name = pcall(function() return opt:getName() end)
+            local valOk, val   = pcall(function() return opt:getValue() end)
+            if nameOk and name and valOk then
+                pcall(function() so:set(name, val) end)
+            end
         end)
     end
     RankLog.info(string.format("applyRules: %d/%d aplicados, %d falhos.", applied, #RULES, failed))
@@ -392,19 +398,26 @@ function RankSandbox.applyFullPreset()
                     syncToJava(v, key)
                 else
                     pcall(function()
-                        local opt = getSandboxOptions():getOptionByName(key)
-                        if not opt then return end
-                        -- opt:getType() pode lançar RuntimeException (escapa pcall externo)
+                        -- getSandboxOptions() pode retornar null Java; encadear diretamente
+                        -- getOptionByName() nesse caso lança RuntimeException escapando pcall.
+                        local soOk, so = pcall(function() return getSandboxOptions() end)
+                        if not soOk or not so then return end
+                        local optOk, opt = pcall(function() return so:getOptionByName(key) end)
+                        if not optOk or not opt then return end
                         local optTypeOk, optType = pcall(function() return opt:getType() end)
                         if not optTypeOk then return end
                         if type(v) == "boolean" then
-                            opt:setValue(v)
+                            pcall(function() opt:setValue(v) end)
                         elseif optType == "string" or optType == "text" then
-                            opt:setValue(tostring(v))
+                            pcall(function() opt:setValue(tostring(v)) end)
                         else
-                            opt:parse(tostring(v))
+                            pcall(function() opt:parse(tostring(v)) end)
                         end
-                        getSandboxOptions():set(opt:getName(), opt:getValue())
+                        local nameOk, name = pcall(function() return opt:getName() end)
+                        local valOk, val   = pcall(function() return opt:getValue() end)
+                        if nameOk and name and valOk then
+                            pcall(function() so:set(name, val) end)
+                        end
                     end)
                 end
             end

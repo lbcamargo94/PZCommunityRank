@@ -247,7 +247,13 @@ local function triggerRank(player, playerIndex, isDead, deathCause)
     pcall(function() RankFile.saveManifest(entry) end)
     -- Exporta sandbox em arquivo separado - independente do PZRX2
     pcall(function() RankSandboxExport.export(entry.character_name) end)
-    RankSubmitUI.open(entry, code, playerIndex)
+    -- RankSubmitUI.open sem pcall: se lançar, submitted[playerIndex] fica true
+    -- e o jogador nunca mais consegue gerar rank neste run (estado travado).
+    local uiOk, uiErr = pcall(function() RankSubmitUI.open(entry, code, playerIndex) end)
+    if not uiOk then
+        RankLog.error("RankSubmitUI.open falhou: " .. tostring(uiErr))
+        RankMain.submitted[playerIndex] = false
+    end
 end
 
 RankMain.triggerRank = triggerRank
@@ -761,14 +767,22 @@ addOptionalEvent("OnContainerUpdate", function(container)
         if not container or not instanceof(container, "ItemContainer") then return end
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
-        -- Obtém o building ID do container (via IsoObject pai)
-        local bldOk, bldId = pcall(function()
+        -- Obtém o building ID: bld:getDef():hashCode() é cadeia perigosa —
+        -- getDef() chamado duas vezes no mesmo pcall; se retornar null Java
+        -- a segunda chamada lança RuntimeException que escapa pcall único.
+        local bldId = nil
+        pcall(function()
             local parent = container:getParent()
             local sq = parent and parent:getSquare()
-            if not sq then return nil end
-            local bld = sq:getBuilding()
-            return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
+            if not sq then return end
+            local sqBldOk, bld = pcall(function() return sq:getBuilding() end)
+            if not sqBldOk or not bld then return end
+            local defOk, def = pcall(function() return bld:getDef() end)
+            if not defOk or not def then return end
+            local hashOk, hash = pcall(function() return def:hashCode() end)
+            if hashOk and hash then bldId = tostring(hash) end
         end)
+        local bldOk = bldId ~= nil
         if not bldOk or not bldId then return end
         local mdOk, md = pcall(function() return player:getModData() end)
         if not mdOk or not md then return end
@@ -848,11 +862,17 @@ local function checkSpiffoVisit()
     if not nameOk or not roomName then return end
     if not SPIFFO_ROOMS[roomName:lower()] then return end
 
-    local bldOk, bldId = pcall(function()
-        local bld = sq:getBuilding()
-        return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
+    -- bld:getDef():hashCode() — cadeia perigosa; getDef() chamado 2x no mesmo pcall.
+    local bldId = nil
+    pcall(function()
+        local sqBldOk, bld = pcall(function() return sq:getBuilding() end)
+        if not sqBldOk or not bld then return end
+        local defOk, def = pcall(function() return bld:getDef() end)
+        if not defOk or not def then return end
+        local hashOk, hash = pcall(function() return def:hashCode() end)
+        if hashOk and hash then bldId = tostring(hash) end
     end)
-    if not bldOk or not bldId then return end
+    if not bldId then return end
 
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
@@ -1317,11 +1337,17 @@ local function checkBasementVisit()
     if not zOk or not z or z >= 0 then return end
     local sqOk, sq = pcall(function() return player:getCurrentSquare() end)
     if not sqOk or not sq then return end
-    local bldOk, bldId = pcall(function()
-        local bld = sq:getBuilding()
-        return bld and bld:getDef() and tostring(bld:getDef():hashCode()) or nil
+    -- bld:getDef():hashCode() — cadeia perigosa; getDef() chamado 2x no mesmo pcall.
+    local bldId = nil
+    pcall(function()
+        local sqBldOk, bld = pcall(function() return sq:getBuilding() end)
+        if not sqBldOk or not bld then return end
+        local defOk, def = pcall(function() return bld:getDef() end)
+        if not defOk or not def then return end
+        local hashOk, hash = pcall(function() return def:hashCode() end)
+        if hashOk and hash then bldId = tostring(hash) end
     end)
-    if not bldOk or not bldId then return end
+    if not bldId then return end
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
     local tag = "|" .. bldId .. "|"
@@ -1639,18 +1665,21 @@ pcall(function()
     if not ISPostDeathUI then return end
     local _origPrerender = ISPostDeathUI.prerender
     ISPostDeathUI.prerender = function(self)
-        _origPrerender(self)
+        pcall(function() _origPrerender(self) end)
         if not self.buttonRespawn then return end
-        if not self.buttonRespawn:isVisible() then return end
+        -- buttonRespawn:isVisible() pode lançar RuntimeException — pcall obrigatório.
+        -- Roda todo frame na tela de morte; uma falha sem pcall desregistraria o handler.
+        local visOk, vis = pcall(function() return self.buttonRespawn:isVisible() end)
+        if not visOk or not vis then return end
         if self._rankIsChallengeGame == nil then
-            local player = getSpecificPlayer(self.playerIndex or 0)
-            self._rankIsChallengeGame = isBrasileiraoGame(player)
+            local ok2, player = pcall(function() return getSpecificPlayer(self.playerIndex or 0) end)
+            self._rankIsChallengeGame = ok2 and isBrasileiraoGame(player) or false
         end
         if self._rankIsChallengeGame then
-            self.buttonRespawn:setVisible(false)
+            pcall(function() self.buttonRespawn:setVisible(false) end)
         end
     end
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.17.2")
+RankLog.info("Mod carregado - B42.20 | v2.19.0")

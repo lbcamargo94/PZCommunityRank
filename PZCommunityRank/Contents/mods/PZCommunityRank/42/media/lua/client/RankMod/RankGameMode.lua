@@ -64,15 +64,18 @@ local function saveDesafioCfg()
                         applyToOpts(v, key)
                     else
                         pcall(function()
-                            local opt = opts:getOptionByName(key)
-                            if not opt then return end
-                            local optType = opt:getType()
+                            -- opts:getOptionByName() pode lançar RuntimeException se opts for
+                            -- null Java; opt:getType() também — cada chamada Java precisa de pcall.
+                            local optOk, opt = pcall(function() return opts:getOptionByName(key) end)
+                            if not optOk or not opt then return end
+                            local optTypeOk, optType = pcall(function() return opt:getType() end)
+                            if not optTypeOk then return end
                             if type(v) == "boolean" then
-                                opt:setValue(v)
+                                pcall(function() opt:setValue(v) end)
                             elseif optType == "string" or optType == "text" then
-                                opt:setValue(tostring(v))
+                                pcall(function() opt:setValue(tostring(v)) end)
                             else
-                                opt:parse(tostring(v))
+                                pcall(function() opt:parse(tostring(v)) end)
                             end
                         end)
                     end
@@ -142,11 +145,13 @@ NewGameScreen.clickPlay = function(self)
         -- O flag persiste na sessao Lua ate ser lido e zerado no grace period.
         _RankMod_PendingBrasileiraoSetup = true
 
-        -- Sandbox: fillList() exibe todos os mapas, linha 435 nao sobrescreve preset
-        self.selectedItem.data.mode = GameMode.SANDBOX:toString()
+        -- GameMode.SANDBOX:toString() pode lançar RuntimeException se o enum Java
+        -- não estiver disponível — usar pcall com fallback para string literal.
+        local sandboxModeOk, sandboxMode = pcall(function() return GameMode.SANDBOX:toString() end)
+        self.selectedItem.data.mode = (sandboxModeOk and sandboxMode) and sandboxMode or "Sandbox"
     end
 
-    _origClickPlay(self)
+    pcall(function() _origClickPlay(self) end)
 
     if isBrasileirao then
         self.selectedItem.data.mode = MODE_ID
@@ -157,8 +162,14 @@ NewGameScreen.clickPlay = function(self)
         -- Volta para Apocalypse: fillList ja rodou em Sandbox (lista populada),
         -- agora clickNext vera getGameMode() != "Sandbox" e vai para char creation
         -- sem mostrar a tela de opcoes de sandbox.
+        -- getWorld():setGameMode() — cadeia: getWorld() retornando null lança RuntimeException.
+        -- GameMode.APOCALYPSE:toString() — enum Java também pode lançar.
         pcall(function()
-            getWorld():setGameMode(GameMode.APOCALYPSE:toString())
+            local worldOk, world = pcall(function() return getWorld() end)
+            if not worldOk or not world then return end
+            local modeOk, mode = pcall(function() return GameMode.APOCALYPSE:toString() end)
+            if not modeOk or not mode then return end
+            world:setGameMode(mode)
         end)
         RankLog.info("RankGameMode: modo revertido para Apocalypse (spawn select aberto).")
     end

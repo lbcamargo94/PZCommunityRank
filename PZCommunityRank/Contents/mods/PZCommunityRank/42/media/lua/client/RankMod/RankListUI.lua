@@ -36,10 +36,12 @@ local COLS = {
 local function readRankFile()
     local entries    = {}
     local fileFound  = false
+    local reader     = nil
     pcall(function()
         -- true = Zomboid/Lua/ (onde o Companion escreve); false buscaria no dir do mod
         local r = getFileReader("pz_rank/pz_rank_rank.log", true)
         if not r then return end
+        reader = r
         fileFound = true
         local line = r:readLine()
         while line do
@@ -58,14 +60,24 @@ local function readRankFile()
             end
             line = r:readLine()
         end
-        r:close()
     end)
+    -- Fecha o reader fora do pcall: se readLine() lançar RuntimeException
+    -- o pcall não captura (Kahlua) e r:close() dentro do pcall nunca executaria.
+    if reader then pcall(function() reader:close() end) end
     return entries, fileFound
 end
 
 function RankListUI:new(playerIndex)
-    local screenW = getCore():getScreenWidth()
-    local screenH = getCore():getScreenHeight()
+    -- getCore() pode retornar null Java; chamar getScreenWidth() nesse null lança RuntimeException.
+    local screenW, screenH = 800, 600
+    pcall(function()
+        local core = getCore()
+        if not core then return end
+        local wOk, w = pcall(function() return core:getScreenWidth() end)
+        local hOk, h = pcall(function() return core:getScreenHeight() end)
+        if wOk and w then screenW = w end
+        if hOk and h then screenH = h end
+    end)
     local x = math.floor((screenW - W) / 2)
     local y = math.floor((screenH - H) / 2)
     local o = ISPanel.new(self, x, y, W, H)
@@ -217,8 +229,15 @@ local SB_W = 90
 local SB_H = 26
 
 function RankSidePanel:new(playerIndex, x, y, locked)
-    local screenW = getCore():getScreenWidth()
-    local screenH = getCore():getScreenHeight()
+    local screenW, screenH = 800, 600
+    pcall(function()
+        local core = getCore()
+        if not core then return end
+        local wOk, w = pcall(function() return core:getScreenWidth() end)
+        local hOk, h = pcall(function() return core:getScreenHeight() end)
+        if wOk and w then screenW = w end
+        if hOk and h then screenH = h end
+    end)
     x = x or (screenW - SB_W - 4)
     y = y or math.floor(screenH * 0.38)
     x = math.max(0, math.min(screenW - SB_W, x))
@@ -245,8 +264,17 @@ function RankSidePanel:render()
     ISPanel.render(self)
 
     local label = "Ver Rank"
-    local tw = getTextManager():MeasureStringX(UIFont.Small, label)
-    local th = getTextManager():getFontHeight(UIFont.Small)
+    -- getTextManager():MeasureStringX/getFontHeight() — cadeia: getTextManager() retornando
+    -- null Java faz o método seguinte lançar RuntimeException. Roda todo frame.
+    local tw, th = 40, 14
+    pcall(function()
+        local tm = getTextManager()
+        if not tm then return end
+        local twOk, twVal = pcall(function() return tm:MeasureStringX(UIFont.Small, label) end)
+        local thOk, thVal = pcall(function() return tm:getFontHeight(UIFont.Small) end)
+        if twOk and twVal then tw = twVal end
+        if thOk and thVal then th = thVal end
+    end)
     local tx = math.floor((SB_W - tw) / 2)
     local ty = math.floor((SB_H - th) / 2)
 
@@ -269,8 +297,15 @@ end
 
 function RankSidePanel:onMouseMove(dx, dy)
     if not self.dragging then return end
-    local screenW = getCore():getScreenWidth()
-    local screenH = getCore():getScreenHeight()
+    local screenW, screenH = 800, 600
+    pcall(function()
+        local core = getCore()
+        if not core then return end
+        local wOk, w = pcall(function() return core:getScreenWidth() end)
+        local hOk, h = pcall(function() return core:getScreenHeight() end)
+        if wOk and w then screenW = w end
+        if hOk and h then screenH = h end
+    end)
     local nx = math.max(0, math.min(screenW - self.width,  self:getX() + dx))
     local ny = math.max(0, math.min(screenH - self.height, self:getY() + dy))
     self:setX(nx)

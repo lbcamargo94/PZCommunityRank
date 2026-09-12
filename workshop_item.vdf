@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.18.6 - fix: forward declaration recordHeatmapDeath (mortes nao eram gravadas no heatmap); pcall em animal:isDead/isExistInTheWorld; pcall em opt:getType no RankSandbox"
+	"changenote"		"v2.19.0 - fix critico: split pcall em anyBodyPart/trackVehicleSpeed/getFluidContainer (RankDeathCause); getBodyDamage chain + GameTime.getInstance (RankData); getSandboxOptions chains x2 (RankSandbox); opt:getType + GameMode::toString chains (RankGameMode); bld:getDef():hashCode x3 + RankSubmitUI.open + prerender:isVisible (RankMain); getTextManager/getCore chains + file handle leak (RankListUI/RankUI)"
 }

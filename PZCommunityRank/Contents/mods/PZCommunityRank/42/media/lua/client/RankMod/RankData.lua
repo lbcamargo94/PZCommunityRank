@@ -173,10 +173,14 @@ local function resolveIsDead(player, isDead)
     if isDead ~= nil then return isDead end
     local ok, dead = pcall(function() return player:isDead() end)
     if ok and dead ~= nil then return dead == true end
-    local hOk, hp = pcall(function()
-        return player:getBodyDamage():getOverallBodyHealth()
-    end)
-    if hOk and type(hp) == "number" then return hp <= 0 end
+    -- getBodyDamage():getOverallBodyHealth() — cadeia perigosa:
+    -- se getBodyDamage() retornar null Java, getOverallBodyHealth() lança RuntimeException
+    -- que escapa pcall único em Kahlua.
+    local bdOk, bd2 = pcall(function() return player:getBodyDamage() end)
+    if bdOk and bd2 then
+        local hOk, hp = pcall(function() return bd2:getOverallBodyHealth() end)
+        if hOk and type(hp) == "number" then return hp <= 0 end
+    end
     return false
 end
 
@@ -299,9 +303,17 @@ function RankData.collect(player, isDead)
         local ok, v = pcall(function() return player:getTimeSurvived() end)
         if ok and v then timeRaw = math.floor(v) end
     else
-        local gt = GameTime.getInstance()
-        local worldHours = gt.getWorldAgeHours and gt:getWorldAgeHours() or 0
-        timeRaw = math.floor(worldHours * 60)
+        -- GameTime.getInstance() sem pcall pode lançar RuntimeException;
+        -- gt:getWorldAgeHours() encadeado no mesmo pcall também não é seguro.
+        local gtOk, gt = pcall(function() return GameTime.getInstance() end)
+        if gtOk and gt then
+            local whOk, worldHours = pcall(function()
+                return (type(gt.getWorldAgeHours) == "function") and gt:getWorldAgeHours() or 0
+            end)
+            if whOk and worldHours then
+                timeRaw = math.floor(worldHours * 60)
+            end
+        end
     end
 
     local kills = 0
