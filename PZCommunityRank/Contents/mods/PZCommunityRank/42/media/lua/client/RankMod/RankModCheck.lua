@@ -151,9 +151,11 @@ local function safeGetActiveModList()
                     local line = reader:readLine()
                     while line do
                         line = line:match("^%s*(.-)%s*$")
-                        if line ~= "" and not line:match("^#") then
-                            RankLog.info("[M6-Save] mod = " .. line)
-                            if not seen[line] then seen[line] = true; mods[#mods + 1] = line end
+                        -- Formato B42: "mod = <id>," (estruturado)
+                        local modId = line:match("^mod%s*=%s*(.-)%s*,?%s*$")
+                        if modId and modId ~= "" then
+                            RankLog.info("[M6-Save] mod = " .. modId)
+                            if not seen[modId] then seen[modId] = true; mods[#mods + 1] = modId end
                         end
                         line = reader:readLine()
                     end

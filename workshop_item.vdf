@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.19.4 - feat: restaura M6 (leitura de mods.txt do save) para detectar mods de workshop que getActiveMods() nao captura no B42; pattern nil-check seguro para getWorldName()"
+	"changenote"		"v2.19.5 - fix: parser M6 corrigido para formato B42 (mod = <id>,) em vez de linha-por-id do B41"
 }
