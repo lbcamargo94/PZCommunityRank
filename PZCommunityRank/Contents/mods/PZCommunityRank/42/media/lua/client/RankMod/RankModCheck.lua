@@ -6,7 +6,7 @@
 --
 --  Formato do arquivo (uma entrada por linha):
 --    ALLOW:<mod_id>    -- mod permitido (opcional)
---    REQUIRE:<mod_id>  -- mod obrigatório (deve estar ativo)
+--    REQUIRE:<mod_id>  -- mod obrigatorio (deve estar ativo)
 --    Linhas em branco ou iniciadas por '#' sao ignoradas.
 --
 --  Comportamento quando o arquivo está ausente:
@@ -94,9 +94,10 @@ local function collectJavaList(label, javaList, out, seen)
 end
 
 -- Coleta os mod IDs ativos.
--- M1 e M2: APIs Java confirmadas seguras (retornam IDs internos no B42).
--- M6: lê mods.txt do save atual via getFileReader (puro Lua, sem Java internals).
---     Restaurado do v2.18.4 com pattern nil-check para evitar crash no getWorldName.
+-- M1 e M2: APIs Java confirmadas seguras (retornam apenas IDs internos no B42).
+-- M6: le mods.txt do save atual via getFileReader (puro Lua, sem Java internals).
+--     API correta B42: getWorld():getWorld() = nome do save
+--                      getWorld():getGameMode() = modo (Survival/Sandbox)
 local function safeGetActiveModList()
     local mods = {}
     local seen = {}
@@ -121,50 +122,56 @@ local function safeGetActiveModList()
         end
     end)
 
-    -- M6: lê mods.txt da pasta do save atual
-    -- getFileReader(path, true) usa Zomboid/Lua/ como raiz →
-    --   ../../Saves/Survival/<world>/mods.txt = Zomboid/Saves/Survival/<world>/mods.txt
+    -- M6: le mods.txt da pasta do save atual
+    -- getFileReader(path, true) usa Zomboid/Lua/ como raiz:
+    --   ../Saves/<gameMode>/<worldName>/mods.txt = Zomboid/Saves/Survival/<world>/mods.txt
+    -- API correta B42: getWorld():getWorld() retorna o nome da pasta do save
     pcall(function()
-        local world = getWorld and getWorld()
-        if not world then RankLog.warn("[M6-Save] getWorld() indisponivel"); return end
+        local w = getWorld and getWorld()
+        if not w then RankLog.warn("[M6-Save] getWorld() indisponivel"); return end
 
-        local worldName
-        local getWorldNameFn = world.getWorldName  -- nil se metodo nao existe; sem throw
-        if getWorldNameFn ~= nil then
-            pcall(function() worldName = getWorldNameFn(world) end)
+        local worldName, gameMode
+
+        local getWorldFn = w.getWorld
+        if getWorldFn ~= nil then
+            pcall(function() worldName = getWorldFn(w) end)
         end
+        local getGameModeFn = w.getGameMode
+        if getGameModeFn ~= nil then
+            pcall(function() gameMode = getGameModeFn(w) end)
+        end
+
         if not worldName or worldName == "" then
-            RankLog.warn("[M6-Save] getWorldName() falhou ou retornou vazio")
+            RankLog.warn("[M6-Save] getWorld():getWorld() falhou ou retornou vazio")
             return
         end
-        RankLog.info("[M6-Save] save = " .. worldName)
+        gameMode = (gameMode and gameMode ~= "") and gameMode or "Survival"
+        RankLog.info("[M6-Save] save=" .. worldName .. " mode=" .. gameMode)
 
-        local basePaths = { "../Saves/Survival/", "../Saves/Sandbox/" }
-        local fileNames  = { "mods.txt", "Mods.txt" }
+        local fileNames = { "mods.txt", "Mods.txt" }
+        local basePath  = "../Saves/" .. gameMode .. "/" .. worldName .. "/"
 
-        for _, base in ipairs(basePaths) do
-            for _, fname in ipairs(fileNames) do
-                local path = base .. worldName .. "/" .. fname
-                local ok, reader = pcall(getFileReader, path, true)
-                if ok and reader then
-                    RankLog.info("[M6-Save] lendo: " .. path)
-                    local line = reader:readLine()
-                    while line do
-                        line = line:match("^%s*(.-)%s*$")
-                        -- Formato B42: "mod = <id>," (estruturado)
-                        local modId = line:match("^mod%s*=%s*(.-)%s*,?%s*$")
-                        if modId and modId ~= "" then
-                            RankLog.info("[M6-Save] mod = " .. modId)
-                            if not seen[modId] then seen[modId] = true; mods[#mods + 1] = modId end
-                        end
-                        line = reader:readLine()
+        for _, fname in ipairs(fileNames) do
+            local fullPath = basePath .. fname
+            local ok, reader = pcall(getFileReader, fullPath, true)
+            if ok and reader then
+                RankLog.info("[M6-Save] lendo: " .. fullPath)
+                local line = reader:readLine()
+                while line do
+                    line = line:match("^%s*(.-)%s*$")
+                    -- Formato B42: "mod = <id>," (estruturado)
+                    local modId = line:match("^mod%s*=%s*(.-)%s*,?%s*$")
+                    if modId and modId ~= "" then
+                        RankLog.info("[M6-Save] mod = " .. modId)
+                        if not seen[modId] then seen[modId] = true; mods[#mods + 1] = modId end
                     end
-                    pcall(function() reader:close() end)
-                    return
+                    line = reader:readLine()
                 end
+                pcall(function() reader:close() end)
+                return
             end
         end
-        RankLog.warn("[M6-Save] mods.txt nao encontrado (salvo=" .. worldName .. ")")
+        RankLog.warn("[M6-Save] mods.txt nao encontrado em: " .. basePath)
     end)
 
     RankLog.info("safeGetActiveModList: total unico = " .. #mods)

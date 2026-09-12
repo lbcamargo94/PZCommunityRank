@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.19.6 - fix: caminho M6 corrigido para ../Saves/ (era ../../Saves/ = fora da pasta Zomboid)"
+	"changenote"		"v2.19.7 - fix: API correta B42 para nome do save: getWorld():getWorld() e getGameMode() (getWorldName() nao existe no B42)"
 }
