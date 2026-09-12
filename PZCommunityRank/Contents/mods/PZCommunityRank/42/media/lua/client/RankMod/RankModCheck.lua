@@ -122,56 +122,57 @@ local function safeGetActiveModList()
         end
     end)
 
-    -- M6: le mods.txt da pasta do save atual
-    -- getFileReader(path, true) usa Zomboid/Lua/ como raiz:
-    --   ../Saves/<gameMode>/<worldName>/mods.txt = Zomboid/Saves/Survival/<world>/mods.txt
-    -- API correta B42: getWorld():getWorld() retorna o nome da pasta do save
+    -- M7: getSaveInfo(getWorld():getWorld()).activeMods:getMods()
+    -- API oficial PZ B42 para mods do save atual. getSaveInfo e uma funcao Lua nativa
+    -- que retorna tabela com campo activeMods (objeto Java com getMods():ArrayList<String>).
+    -- Iteracao: size() + get(i-1) (0-indexed), conforme LoadGameScreen.lua do PZ.
     pcall(function()
         local w = getWorld and getWorld()
-        if not w then RankLog.warn("[M6-Save] getWorld() indisponivel"); return end
+        if not w then RankLog.warn("[M7-SaveInfo] getWorld() indisponivel"); return end
 
-        local worldName, gameMode
-
+        local worldName
         local getWorldFn = w.getWorld
         if getWorldFn ~= nil then
             pcall(function() worldName = getWorldFn(w) end)
         end
-        local getGameModeFn = w.getGameMode
-        if getGameModeFn ~= nil then
-            pcall(function() gameMode = getGameModeFn(w) end)
-        end
-
         if not worldName or worldName == "" then
-            RankLog.warn("[M6-Save] getWorld():getWorld() falhou ou retornou vazio")
+            RankLog.warn("[M7-SaveInfo] getWorld():getWorld() falhou")
             return
         end
-        gameMode = (gameMode and gameMode ~= "") and gameMode or "Survival"
-        RankLog.info("[M6-Save] save=" .. worldName .. " mode=" .. gameMode)
+        RankLog.info("[M7-SaveInfo] save=" .. worldName)
 
-        local fileNames = { "mods.txt", "Mods.txt" }
-        local basePath  = "../Saves/" .. gameMode .. "/" .. worldName .. "/"
-
-        for _, fname in ipairs(fileNames) do
-            local fullPath = basePath .. fname
-            local ok, reader = pcall(getFileReader, fullPath, true)
-            if ok and reader then
-                RankLog.info("[M6-Save] lendo: " .. fullPath)
-                local line = reader:readLine()
-                while line do
-                    line = line:match("^%s*(.-)%s*$")
-                    -- Formato B42: "mod = <id>," (estruturado)
-                    local modId = line:match("^mod%s*=%s*(.-)%s*,?%s*$")
-                    if modId and modId ~= "" then
-                        RankLog.info("[M6-Save] mod = " .. modId)
-                        if not seen[modId] then seen[modId] = true; mods[#mods + 1] = modId end
-                    end
-                    line = reader:readLine()
-                end
-                pcall(function() reader:close() end)
-                return
-            end
+        local ok1, saveInfo = pcall(getSaveInfo, worldName)
+        if not ok1 or not saveInfo then
+            RankLog.warn("[M7-SaveInfo] getSaveInfo() falhou")
+            return
         end
-        RankLog.warn("[M6-Save] mods.txt nao encontrado em: " .. basePath)
+
+        local activeMods = saveInfo.activeMods
+        if not activeMods then
+            RankLog.warn("[M7-SaveInfo] activeMods nil no saveInfo")
+            return
+        end
+
+        local ok2, modList = pcall(function() return activeMods:getMods() end)
+        if not ok2 or not modList then
+            RankLog.warn("[M7-SaveInfo] getMods() falhou")
+            return
+        end
+
+        local sz = 0
+        pcall(function() sz = modList:size() end)
+        RankLog.info("[M7-SaveInfo] " .. sz .. " mod(s) no save")
+
+        for i = 1, sz do
+            pcall(function()
+                local modID = modList:get(i - 1)  -- ArrayList Java e 0-indexed
+                if modID and modID ~= "" then
+                    local s = tostring(modID)
+                    RankLog.info("[M7-SaveInfo] mod = " .. s)
+                    if not seen[s] then seen[s] = true; mods[#mods + 1] = s end
+                end
+            end)
+        end
     end)
 
     RankLog.info("safeGetActiveModList: total unico = " .. #mods)

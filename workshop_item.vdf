@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.19.7 - fix: API correta B42 para nome do save: getWorld():getWorld() e getGameMode() (getWorldName() nao existe no B42)"
+	"changenote"		"v2.19.8 - fix: M7 usa getSaveInfo().activeMods:getMods() (API oficial B42, sem path traversal); M6 removido (sandbox bloqueia ../ no getFileReader)"
 }
