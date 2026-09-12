@@ -228,6 +228,8 @@ local function triggerRank(player, playerIndex, isDead, deathCause)
     if anyViolation then
         if _debugViolationDetected then
             entry.disqualification_reason = "debug"
+        elseif _modViolationDetected then
+            entry.disqualification_reason = buildModReason()
         else
             entry.disqualification_reason = "sandbox"
         end
@@ -278,6 +280,8 @@ local function silentUpdate(player, playerIndex)
     if anyViolation then
         if _debugViolationDetected then
             entry.disqualification_reason = "debug"
+        elseif _modViolationDetected then
+            entry.disqualification_reason = buildModReason()
         else
             entry.disqualification_reason = "sandbox"
         end
@@ -689,11 +693,10 @@ pcall(function()
         ISKillAnimal.complete = function(self)
             local animal = self and self.animal
             local character = self and self.character
-            local completed = originalComplete(self)
-            if completed and character and isLocalPlayer(character) and animal then
+            originalComplete(self)
+            if character and isLocalPlayer(character) and animal then
                 recordAnimalKill(animal)
             end
-            return completed
         end
         ISKillAnimal._pzRankPatched = true
         RankLog.info("Animais abatidos: fallback B42 instalado.")
@@ -725,12 +728,11 @@ pcall(function()
             and not ISPickupFishAction._pzRankPatched then
         local originalComplete = ISPickupFishAction.complete
         ISPickupFishAction.complete = function(self)
-            local completed = originalComplete(self)
-            if completed and self and self.isFish and not self._pzRankFishCounted then
+            originalComplete(self)
+            if self and self.isFish and not self._pzRankFishCounted then
                 self._pzRankFishCounted = true
                 recordFishCaught(self.character)
             end
-            return completed
         end
         ISPickupFishAction._pzRankPatched = true
         RankLog.info("Peixes capturados: fallback B42 instalado.")
@@ -1316,9 +1318,11 @@ local function checkZoneVisit()
 
     -- Fallback: verifica nome do room atual para bases militares
     pcall(function()
-        local room = sq:getRoom()
-        if not room then return end
-        local roomName = tostring(room:getName() or ""):lower()
+        local roomOk2, room = pcall(function() return sq:getRoom() end)
+        if not roomOk2 or not room then return end
+        local roomNameOk, rawName = pcall(function() return room:getName() end)
+        if not roomNameOk or not rawName then return end
+        local roomName = tostring(rawName):lower()
         local roomKey = "room_" .. roomName
         if not _visitedMilZones[roomKey] then
             if roomName:find("armory", 1, true) or roomName:find("barracks", 1, true) or
