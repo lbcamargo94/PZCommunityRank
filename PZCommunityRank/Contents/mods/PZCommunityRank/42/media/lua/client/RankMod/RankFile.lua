@@ -24,9 +24,12 @@ local function systemTime()
     local ok, s = pcall(function() return os.date("%Y-%m-%d %H:%M:%S") end)
     if ok and type(s) == "string" and #s > 10 then return s end
 
-    local ok2, ms = pcall(function()
-        return luajava.bindClass("java.lang.System"):currentTimeMillis()
-    end)
+    local ok2, ms = false, nil
+    if luajava then
+        ok2, ms = pcall(function()
+            return luajava.bindClass("java.lang.System"):currentTimeMillis()
+        end)
+    end
     if ok2 and ms then
         local t    = math.floor(tonumber(tostring(ms)) / 1000)
         local ok3, s3 = pcall(function() return os.date("%Y-%m-%d %H:%M:%S", t) end)

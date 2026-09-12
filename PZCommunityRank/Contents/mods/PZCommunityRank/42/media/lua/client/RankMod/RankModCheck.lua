@@ -64,8 +64,8 @@ local function readWhitelist()
             end
             line = reader:readLine()
         end
-        reader:close()
     end)
+    pcall(function() reader:close() end)
 
     if not hasEntry then return nil end
     return { allowed = allowed, required = required }

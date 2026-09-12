@@ -94,12 +94,11 @@ end
 -- depois marca o arquivo como consumido para nao repetir na proxima sessao.
 local function checkClearViolationFile(player)
     local content = nil
-    pcall(function()
-        local r = getFileReader("pz_rank/pz_rank_clear_violation.txt", false)
-        if not r then return end
-        content = r:readLine()
-        r:close()
-    end)
+    local rOk, r = pcall(function() return getFileReader("pz_rank/pz_rank_clear_violation.txt", false) end)
+    if rOk and r then
+        pcall(function() content = r:readLine() end)
+        pcall(function() r:close() end)
+    end
     if content ~= "clear" then return end
 
     pcall(function()
@@ -488,8 +487,11 @@ local function onGameStart()
 
             -- Cria botao lateral persistente para abrir a tela de rank.
             pcall(function()
-                if _sidePanel and not _sidePanel:isRemoved() then
-                    _sidePanel:removeFromUIManager()
+                if _sidePanel then
+                    local removedOk, removed = pcall(function() return _sidePanel:isRemoved() end)
+                    if not removedOk or not removed then
+                        pcall(function() _sidePanel:removeFromUIManager() end)
+                    end
                 end
                 _sidePanel = RankSidePanel.show(0)
             end)
@@ -1232,9 +1234,10 @@ local function updateVehicleDistance()
     local vehOk, vehicle = pcall(function() return player:getVehicle() end)
     if not vehOk or not vehicle then _lastVehiclePos = nil; return end
 
-    local px, py = 0, 0
-    local posOk = pcall(function() px = vehicle:getX(); py = vehicle:getY() end)
-    if not posOk then return end
+    local xOk, px = pcall(function() return vehicle:getX() end)
+    if not xOk or type(px) ~= "number" then return end
+    local yOk, py = pcall(function() return vehicle:getY() end)
+    if not yOk or type(py) ~= "number" then return end
 
     if _lastVehiclePos then
         local dx = px - _lastVehiclePos.x
