@@ -177,14 +177,20 @@ local function safeGetActiveModList()
                 local entry = infoList:get(i)
                 if not entry then return end
                 local id
+                -- Obtém referência do método ANTES de chamar; evita "call nil" RuntimeException
                 for _, key in ipairs({"getId", "getModID", "getID"}) do
-                    local ok, val = pcall(function() return entry[key](entry) end)
-                    if ok and val then id = tostring(val); break end
+                    local fn = entry[key]          -- nil se não existe; sem throw
+                    if fn ~= nil and id == nil then
+                        local ok, val = pcall(fn, entry)
+                        if ok and val then id = tostring(val) end
+                    end
                 end
                 if not id then
                     for _, field in ipairs({"modID", "id"}) do
                         local ok, val = pcall(function() return entry[field] end)
-                        if ok and val then id = tostring(val); break end
+                        if ok and val and type(val) ~= "function" then
+                            id = tostring(val); break
+                        end
                     end
                 end
                 if id then
@@ -203,7 +209,10 @@ local function safeGetActiveModList()
         if not world then RankLog.warn("[M6-Save] getWorld() indisponivel"); return end
 
         local worldName
-        pcall(function() worldName = world:getWorldName() end)
+        local getWorldNameFn = world.getWorldName   -- nil se método não existe; sem throw
+        if getWorldNameFn ~= nil then
+            pcall(function() worldName = getWorldNameFn(world) end)
+        end
         if not worldName or worldName == "" then
             RankLog.warn("[M6-Save] getWorldName() falhou")
             return
