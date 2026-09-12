@@ -139,7 +139,7 @@ local function safeGetActiveModList()
         end
         RankLog.info("[M6-Save] save = " .. worldName)
 
-        local basePaths = { "../../Saves/Survival/", "../../Saves/Sandbox/" }
+        local basePaths = { "../Saves/Survival/", "../Saves/Sandbox/" }
         local fileNames  = { "mods.txt", "Mods.txt" }
 
         for _, base in ipairs(basePaths) do
