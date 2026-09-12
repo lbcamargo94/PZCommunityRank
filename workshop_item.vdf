@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.19.3 - fix: 7 sets O(n) → caches in-memory O(1); _countedAnimals usa string key (era Java obj → memory leak); getAttackedBy instanceof guard; caches populados do ModData ao carregar save"
+	"changenote"		"v2.19.4 - feat: restaura M6 (leitura de mods.txt do save) para detectar mods de workshop que getActiveMods() nao captura no B42; pattern nil-check seguro para getWorldName()"
 }
