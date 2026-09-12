@@ -325,6 +325,10 @@ local function isLocalPlayer(player)
     return not (isClient and isClient())
 end
 
+-- Forward declaration: recordHeatmapDeath é definida abaixo mas referenciada
+-- aqui dentro de pcall(recordHeatmapDeath, player). Sem isso resolve nil em Lua.
+local recordHeatmapDeath
+
 -- -- Evento: morte do jogador --------------------------------
 local function onPlayerDeath(player, playerIndex)
     if not player then return end
@@ -553,7 +557,8 @@ local function incHeatmapKill(player)
 end
 
 -- Registra a posição de morte do jogador.
-local function recordHeatmapDeath(player)
+-- NOTA: não usar "local function" aqui — forward declaration está acima (linha ~328).
+recordHeatmapDeath = function(player)
     if not player then return end
     local gx, gy = getPlayerGridCell(player)
     if not gx then return end
@@ -652,9 +657,11 @@ local function updateTrackedAnimalDeaths()
         local animal = tracked.animal
         tracked.ticks = tracked.ticks + 1
 
-        -- IsoAnimal:isDead() e isExistInTheWorld() sao APIs usadas pelos
-        -- scripts vanilla B42. Se sumiu logo apos ser atingido, virou cadáver.
-        if animal:isDead() or not animal:isExistInTheWorld() then
+        -- isDead/isExistInTheWorld são Java; RuntimeException escapa pcall único.
+        local dead, exists = false, true
+        pcall(function() dead = animal:isDead() end)
+        pcall(function() exists = animal:isExistInTheWorld() end)
+        if dead or not exists then
             recordAnimalKill(animal)
             table.remove(_trackedAnimals, i)
         elseif tracked.ticks >= ANIMAL_TRACK_TICKS then

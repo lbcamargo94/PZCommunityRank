@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.18.5 - hotfix: remover M3-M6 que causavam crash (RuntimeException Java escapa pcall do Kahlua); volta para M1+M2 seguros"
+	"changenote"		"v2.18.6 - fix: forward declaration recordHeatmapDeath (mortes nao eram gravadas no heatmap); pcall em animal:isDead/isExistInTheWorld; pcall em opt:getType no RankSandbox"
 }

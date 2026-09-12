@@ -394,7 +394,9 @@ function RankSandbox.applyFullPreset()
                     pcall(function()
                         local opt = getSandboxOptions():getOptionByName(key)
                         if not opt then return end
-                        local optType = opt:getType()
+                        -- opt:getType() pode lançar RuntimeException (escapa pcall externo)
+                        local optTypeOk, optType = pcall(function() return opt:getType() end)
+                        if not optTypeOk then return end
                         if type(v) == "boolean" then
                             opt:setValue(v)
                         elseif optType == "string" or optType == "text" then

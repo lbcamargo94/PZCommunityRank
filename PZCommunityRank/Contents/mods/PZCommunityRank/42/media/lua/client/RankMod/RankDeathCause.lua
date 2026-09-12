@@ -5,6 +5,9 @@
 -- a tradução fica no frontend.
 --
 -- Ordem de prioridade: causas violentas/instantâneas primeiro, lentas/acumuladas por último.
+--
+-- NOTA KAHLUA: pcall NÃO captura java.lang.RuntimeException — apenas erros Lua.
+-- Todo acesso a método Java que possa lançar RuntimeException usa pcall individual.
 
 RankDeathCause = RankDeathCause or {}
 
@@ -22,38 +25,53 @@ local BLEACH_MEMORY_SECONDS = 1800
 -- ISDrinkFromBottle pode não existir em todas as builds do B42; carrega de forma segura.
 local _drinkOk = pcall(function() require "TimedActions/ISDrinkFromBottle" end)
 
+-- anyBodyPart: itera partes do corpo Java com pcall completo.
 local function anyBodyPart(bd, checkFn)
-    local parts = bd:getBodyParts()
-    for i = 0, parts:size() - 1 do
-        if checkFn(parts:get(i)) then return true end
-    end
-    return false
+    local ok, result = pcall(function()
+        local parts = bd:getBodyParts()
+        for i = 0, parts:size() - 1 do
+            if checkFn(parts:get(i)) then return true end
+        end
+        return false
+    end)
+    return ok and result == true
 end
 
 local function trackVehicleSpeed(playerObj)
-    if not playerObj or playerObj:isDead() then return end
-    if not playerObj:isSeatedInVehicle() then return end
-    local vehicle = playerObj:getVehicle()
-    if not vehicle then return end
-    local speed = math.abs(vehicle:getCurrentSpeedKmHour())
-    local prev = RankDeathCause.lastSpeed[playerObj]
-    if prev and (prev - speed) >= CRASH_DROP_KMH then
-        RankDeathCause.lastCrash[playerObj] = { speed = math.floor(speed + 0.5), time = getTimestamp() }
-    end
-    RankDeathCause.lastSpeed[playerObj] = speed
+    -- Envolvido em pcall: isDead/isSeatedInVehicle/getCurrentSpeedKmHour
+    -- são chamadas Java que podem lançar RuntimeException a qualquer tick.
+    pcall(function()
+        if not playerObj or playerObj:isDead() then return end
+        if not playerObj:isSeatedInVehicle() then return end
+        local vehicle = playerObj:getVehicle()
+        if not vehicle then return end
+        local speed = math.abs(vehicle:getCurrentSpeedKmHour())
+        local prev = RankDeathCause.lastSpeed[playerObj]
+        if prev and (prev - speed) >= CRASH_DROP_KMH then
+            RankDeathCause.lastCrash[playerObj] = { speed = math.floor(speed + 0.5), time = getTimestamp() }
+        end
+        RankDeathCause.lastSpeed[playerObj] = speed
+    end)
 end
 Events.OnPlayerUpdate.Add(trackVehicleSpeed)
 
 if _drinkOk and ISDrinkFromBottle and ISDrinkFromBottle.drink then
     local origDrink = ISDrinkFromBottle.drink
     function ISDrinkFromBottle:drink(food, percentage)
-        local ok, hasBleach = pcall(function()
-            return food and food:getFluidContainer() and food:getFluidContainer():contains(Fluid.Bleach)
-        end)
-        if ok and hasBleach then
-            RankDeathCause.lastBleach[self.character] = getTimestamp()
+        -- self.character pode ser nil se o objeto for criado antes do personagem carregar
+        if self.character then
+            local ok, hasBleach = pcall(function()
+                return food and food:getFluidContainer() and food:getFluidContainer():contains(Fluid.Bleach)
+            end)
+            if ok and hasBleach then
+                RankDeathCause.lastBleach[self.character] = getTimestamp()
+            end
         end
-        origDrink(self, food, percentage)
+        -- origDrink sem pcall propagaria RuntimeException para o engine; envolver protege a cadeia
+        local callOk, err = pcall(origDrink, self, food, percentage)
+        if not callOk then
+            print("[RankDeathCause] origDrink falhou: " .. tostring(err))
+        end
     end
 end
 
@@ -75,9 +93,10 @@ local function detectPvP(p)
 end
 
 local function detectZombie(p)
-    local bd = p:getBodyDamage()
-    local horde = false
+    local bdOk, bd = pcall(function() return p:getBodyDamage() end)
+    if not bdOk or not bd then return nil end
 
+    local horde = false
     local ok1, dragDown = pcall(function() return p:isDeathDragDown() end)
     if ok1 and dragDown then horde = true end
     if not horde then
@@ -88,7 +107,6 @@ local function detectZombie(p)
     local bitten = anyBodyPart(bd, function(pt) return pt:bitten() or pt:isInfectedWound() end)
 
     -- Mortalidade instantânea: bd:isInfected() é o flag real do vírus sistêmico.
-    -- Ver comentário original em CauseOfDeath.lua linha 127-158.
     local systemic = false
     if not bitten and not horde then
         local ok3, inf = pcall(function() return bd:isInfected() end)
@@ -102,18 +120,21 @@ local function detectZombie(p)
 end
 
 local function detectBurned(p)
-    if p:isOnFire() then return "burned" end
+    local ok, onFire = pcall(function() return p:isOnFire() end)
+    if ok and onFire then return "burned" end
     return nil
 end
 
 local function detectBled(p)
-    local bd = p:getBodyDamage()
+    local bdOk, bd = pcall(function() return p:getBodyDamage() end)
+    if not bdOk or not bd then return nil end
     if anyBodyPart(bd, function(pt) return pt:bleeding() end) then return "bled" end
     return nil
 end
 
 local function detectInfection(p)
-    local bd = p:getBodyDamage()
+    local bdOk, bd = pcall(function() return p:getBodyDamage() end)
+    if not bdOk or not bd then return nil end
     if anyBodyPart(bd, function(pt) return pt:isInfectedWound() or pt:getWoundInfectionLevel() > 0 end) then
         return "infection"
     end
@@ -121,7 +142,12 @@ local function detectInfection(p)
 end
 
 local function detectPoison(p)
-    if p:getStats():get(CharacterStat.POISON) <= 0 then return nil end
+    -- Cadeia p:getStats():get(...) partida em dois pcall: se getStats() retornar
+    -- null Java o segundo :get() lançaria RuntimeException escapando pcall único.
+    local statsOk, stats = pcall(function() return p:getStats() end)
+    if not statsOk or not stats then return nil end
+    local poisonOk, poisonVal = pcall(function() return stats:get(CharacterStat.POISON) end)
+    if not poisonOk or not poisonVal or poisonVal <= 0 then return nil end
     local last = RankDeathCause.lastBleach[p]
     if last and (getTimestamp() - last <= BLEACH_MEMORY_SECONDS) then
         return "bleach"
@@ -139,31 +165,33 @@ end
 
 local FATAL_MOODLE = 4
 
+-- Helper: lê nível de moodle com cadeia pcall segura.
+-- p:getMoodles() pode retornar null Java → getMoodleLevel nesse null lança RuntimeException.
+local function getMoodleLevel(p, moodleType)
+    local moodlesOk, moodles = pcall(function() return p:getMoodles() end)
+    if not moodlesOk or not moodles then return -1 end
+    local lvlOk, lvl = pcall(function() return moodles:getMoodleLevel(moodleType) end)
+    if not lvlOk or lvl == nil then return -1 end
+    return lvl
+end
+
 local function detectCold(p)
-    if p:getMoodles():getMoodleLevel(MoodleType.HYPOTHERMIA) >= FATAL_MOODLE then
-        return "cold"
-    end
+    if getMoodleLevel(p, MoodleType.HYPOTHERMIA) >= FATAL_MOODLE then return "cold" end
     return nil
 end
 
 local function detectSick(p)
-    if p:getMoodles():getMoodleLevel(MoodleType.SICK) >= FATAL_MOODLE then
-        return "sick"
-    end
+    if getMoodleLevel(p, MoodleType.SICK) >= FATAL_MOODLE then return "sick" end
     return nil
 end
 
 local function detectHunger(p)
-    if p:getMoodles():getMoodleLevel(MoodleType.HUNGRY) >= FATAL_MOODLE then
-        return "hunger"
-    end
+    if getMoodleLevel(p, MoodleType.HUNGRY) >= FATAL_MOODLE then return "hunger" end
     return nil
 end
 
 local function detectThirst(p)
-    if p:getMoodles():getMoodleLevel(MoodleType.THIRST) >= FATAL_MOODLE then
-        return "thirst"
-    end
+    if getMoodleLevel(p, MoodleType.THIRST) >= FATAL_MOODLE then return "thirst" end
     return nil
 end
 

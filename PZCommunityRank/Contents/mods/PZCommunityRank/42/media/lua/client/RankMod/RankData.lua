@@ -21,16 +21,23 @@ function RankData.getSkills(player)
     end
 
     for i = 0, maxIndex - 1 do
-        local perkEnum = Perks.fromIndex(i)
-        local perkDef  = PerkFactory.getPerk(perkEnum)
-        if perkDef and perkDef:getParent() ~= Perks.None then
+        -- Perks.fromIndex e PerkFactory.getPerk são chamadas Java que podem
+        -- lançar RuntimeException; pcall no corpo do loop isola cada iteração.
+        pcall(function()
+            local perkEnum = Perks.fromIndex(i)
+            local perkDef  = PerkFactory.getPerk(perkEnum)
+            if not perkEnum or not perkDef then return end
+            local parentOk, parent = pcall(function() return perkDef:getParent() end)
+            if not parentOk or parent == Perks.None then return end
             local lvlOk, lvl = pcall(function() return player:getPerkLevel(perkEnum) end)
             if lvlOk and lvl ~= nil then
-                local id = tostring(perkDef:getType())
-                table.insert(rawTable, { id = id, level = lvl })
-                table.insert(strs, id .. " " .. lvl)
+                local idOk, id = pcall(function() return tostring(perkDef:getType()) end)
+                if idOk and id then
+                    table.insert(rawTable, { id = id, level = lvl })
+                    table.insert(strs, id .. " " .. lvl)
+                end
             end
-        end
+        end)
     end
 
     RankLog.info(string.format("getSkills: %d skills coletadas", #rawTable))
@@ -139,7 +146,11 @@ local function collectTraits(player)
         return result
     end
 
-    local size = known:size()
+    local sizeOk, size = pcall(function() return known:size() end)
+    if not sizeOk or not size then
+        RankLog.warn("collectTraits: known:size() falhou")
+        return result
+    end
     for i = 0, size - 1 do
         local defOk, def = pcall(function()
             return CharacterTraitDefinition.getCharacterTraitDefinition(known:get(i))
@@ -281,10 +292,12 @@ function RankData.collect(player, isDead)
     end
 
     local timeRaw = 0
-    if player.getHoursSurvived then
-        timeRaw = math.floor((player:getHoursSurvived() or 0) * 60)
-    elseif player.getTimeSurvived then
-        timeRaw = math.floor(player:getTimeSurvived() or 0)
+    if type(player.getHoursSurvived) == "function" then
+        local ok, v = pcall(function() return player:getHoursSurvived() end)
+        if ok and v then timeRaw = math.floor(v * 60) end
+    elseif type(player.getTimeSurvived) == "function" then
+        local ok, v = pcall(function() return player:getTimeSurvived() end)
+        if ok and v then timeRaw = math.floor(v) end
     else
         local gt = GameTime.getInstance()
         local worldHours = gt.getWorldAgeHours and gt:getWorldAgeHours() or 0
@@ -292,12 +305,15 @@ function RankData.collect(player, isDead)
     end
 
     local kills = 0
-    if player.getZombieKills then
-        kills = player:getZombieKills() or 0
-    elseif player.getKills then
-        kills = player:getKills() or 0
-    elseif player.getNumZombiesKilled then
-        kills = player:getNumZombiesKilled() or 0
+    if type(player.getZombieKills) == "function" then
+        local ok, v = pcall(function() return player:getZombieKills() end)
+        if ok and v then kills = v end
+    elseif type(player.getKills) == "function" then
+        local ok, v = pcall(function() return player:getKills() end)
+        if ok and v then kills = v end
+    elseif type(player.getNumZombiesKilled) == "function" then
+        local ok, v = pcall(function() return player:getNumZombiesKilled() end)
+        if ok and v then kills = v end
     end
 
     local skillsRaw, skillsStrs = RankData.getSkills(player)
