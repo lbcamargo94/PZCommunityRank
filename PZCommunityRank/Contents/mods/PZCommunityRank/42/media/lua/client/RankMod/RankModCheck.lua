@@ -231,3 +231,88 @@ function RankModCheck.check()
 
     return violations
 end
+
+-- ============================================================
+--  Auto-correcao PRE-carregamento (sem depender do Companion)
+--
+--  Roda no contexto de menu principal (antes do save carregar),
+--  via patch em MainScreen.continueLatestSaveAux (RankModAutoFix.lua).
+--  Usa a MESMA API que a tela nativa "Mods" usa para editar e
+--  gravar o mods.txt de um save existente:
+--    ActiveMods.getById("currentGame"):setModActive(id, false)
+--    manipulateSavefile(folder, "WriteModsDotTxt")
+--  Isso NAO e escrita de arquivo via Lua (getFileWriter) - e uma
+--  funcao nativa do jogo, entao nao esbarra no sandbox que limita
+--  getFileReader/getFileWriter a Zomboid/Lua/.
+--
+--  Como isso roda ANTES do save carregar, o mod bloqueado nunca
+--  chega a ser carregado nesta sessao (nao e so uma correcao para
+--  a proxima vez - evita o problema no acesso atual tambem).
+-- ============================================================
+
+-- Retorna a lista de mod IDs violando a whitelist dentro de um
+-- ArrayList<String> Java (ex: activeMods:getMods()).
+local function findViolationsInJavaList(javaList, whitelist)
+    local violations = {}
+    if not javaList then return violations end
+    local sz = 0
+    pcall(function() sz = javaList:size() end)
+    for i = 0, sz - 1 do
+        local ok, id = pcall(function() return javaList:get(i) end)
+        if ok and id then
+            local s = tostring(id)
+            if not INTERNAL_IDS[s] and not whitelist.allowed[s] then
+                violations[#violations + 1] = s
+            end
+        end
+    end
+    return violations
+end
+
+-- Verifica e corrige o mods.txt do save `saveFolder` ANTES do carregamento.
+-- Retorna:
+--   nil     -> whitelist ausente (Companion nunca rodou) ou save sem info - nao mexeu em nada
+--   {}      -> save ja estava correto
+--   { ... } -> lista de mod IDs removidos do save
+function RankModCheck.autoFixBeforeLoad(saveFolder)
+    local whitelist = readWhitelist()
+    if not whitelist then return nil end
+
+    local infoOk, saveInfo = pcall(getSaveInfo, saveFolder)
+    if not infoOk or not saveInfo or not saveInfo.activeMods then
+        RankLog.warn("autoFixBeforeLoad: getSaveInfo indisponivel para '" .. tostring(saveFolder) .. "'")
+        return nil
+    end
+
+    local modListOk, modList = pcall(function() return saveInfo.activeMods:getMods() end)
+    if not modListOk or not modList then
+        RankLog.warn("autoFixBeforeLoad: activeMods:getMods() falhou para '" .. tostring(saveFolder) .. "'")
+        return nil
+    end
+
+    local violations = findViolationsInJavaList(modList, whitelist)
+    if #violations == 0 then return {} end
+
+    local fixOk, fixErr = pcall(function()
+        local currentMods = ActiveMods.getById("currentGame")
+        currentMods:copyFrom(saveInfo.activeMods)
+        for _, id in ipairs(violations) do
+            currentMods:setModActive(id, false)
+        end
+        currentMods:checkMissingMods()
+        currentMods:checkMissingMaps()
+        manipulateSavefile(saveFolder, "WriteModsDotTxt")
+    end)
+
+    if not fixOk then
+        RankLog.error("autoFixBeforeLoad: falha ao gravar correcao - " .. tostring(fixErr))
+        return nil
+    end
+
+    RankLog.warn(string.format(
+        "autoFixBeforeLoad: %d mod(s) nao permitido(s) removido(s) do save '%s' antes do carregamento.",
+        #violations, tostring(saveFolder)))
+    for _, id in ipairs(violations) do RankLog.warn("  -> removido: " .. id) end
+
+    return violations
+end

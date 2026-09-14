@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.19.8 - fix: M7 usa getSaveInfo().activeMods:getMods() (API oficial B42, sem path traversal); M6 removido (sandbox bloqueia ../ no getFileReader)"
+	"changenote"		"v2.20.0 - feat: auto-correcao do save antes do carregamento - remove mods nao permitidos do mods.txt via ActiveMods+manipulateSavefile (API nativa do jogo), sem depender do Companion. Roda no menu principal antes do save carregar, entao o mod bloqueado nem chega a ser carregado."
 }
