@@ -269,44 +269,213 @@ local function findViolationsInJavaList(javaList, whitelist)
     return violations
 end
 
--- Verifica e corrige o mods.txt do save `saveFolder` ANTES do carregamento.
+-- Monta um mapa modId -> ModInfo varrendo todos os diretorios de mods instalados
+-- (local + Workshop). Usado para saber as dependencias (getRequire()) de cada mod
+-- na hora de reordenar a load order - mesma fonte que o ModSelector nativo usa.
+local function buildModInfoMap()
+    local map = {}
+    pcall(function()
+        for _, directory in ipairs(getModDirectoryTable()) do
+            local modInfo = getModInfo(directory)
+            if modInfo then
+                local idOk, id = pcall(function() return modInfo:getId() end)
+                if idOk and id and id ~= "" and not map[id] then
+                    map[id] = modInfo
+                end
+            end
+        end
+    end)
+    return map
+end
+
+-- Itera um ArrayList<String> Java (metodo getter de ModInfo) chamando addFn(id)
+-- para cada entrada. Usado para require()/getLoadAfter()/getLoadBefore().
+local function forEachModInfoListEntry(modInfo, getterName, addFn)
+    local ok, list = pcall(function() return modInfo[getterName](modInfo) end)
+    if not ok or not list then return end
+    local sz = 0
+    pcall(function() sz = list:size() end)
+    for j = 0, sz - 1 do
+        local idOk, id = pcall(function() return list:get(j) end)
+        if idOk and id then addFn(id) end
+    end
+end
+
+-- Monta um mapa modId -> lista de IDs que devem carregar ANTES dele, combinando
+-- 3 campos de mod.info: require=, loadafter= (mesma semantica de ordenacao) e
+-- loadbefore= (normalizado como loadAfter no mod ALVO - mesma tecnica que o
+-- "Mod Load Order Sorter" usa em updateSortingRulesLoadAfter()).
+local function buildDependencyMap(modInfoMap)
+    local deps = {}
+    local function addDep(modId, depId)
+        if not modId or not depId or modId == depId then return end
+        deps[modId] = deps[modId] or {}
+        deps[modId][depId] = true
+    end
+
+    for modId, modInfo in pairs(modInfoMap) do
+        forEachModInfoListEntry(modInfo, "getRequire", function(reqId) addDep(modId, reqId) end)
+        forEachModInfoListEntry(modInfo, "getLoadAfter", function(afterId) addDep(modId, afterId) end)
+        -- loadbefore=X no mod A significa "A carrega antes de X", ou seja,
+        -- do ponto de vista de X, A e uma dependencia (X carrega depois de A).
+        forEachModInfoListEntry(modInfo, "getLoadBefore", function(beforeId) addDep(beforeId, modId) end)
+    end
+    return deps
+end
+
+-- Reordena `modIds` para que toda dependencia (require=/loadafter=/loadbefore=)
+-- venha antes de quem depende dela - mesma logica que
+-- ModSelector.Model:correctAndSaveModOrder usa nativamente (a mesma funcao
+-- do "Mod Load Order Sorter"). IMPORTANTE: so reordena dependencias que JA
+-- estao em `modIds` - nunca reativa um mod que foi removido por nao ser
+-- permitido so porque outro mod o lista como requisito.
+local function reorderModList(modIds, modInfoMap)
+    local currentSet = {}
+    for _, id in ipairs(modIds) do currentSet[id] = true end
+
+    local dependencyMap = buildDependencyMap(modInfoMap)
+
+    local autoOrder = {}
+    local added = {}
+    for _, id in ipairs(modIds) do
+        local depSet = dependencyMap[id]
+        if depSet then
+            for depId in pairs(depSet) do
+                if currentSet[depId] and not added[depId] then
+                    autoOrder[#autoOrder + 1] = depId
+                    added[depId] = true
+                end
+            end
+        end
+        if not added[id] then
+            autoOrder[#autoOrder + 1] = id
+            added[id] = true
+        end
+    end
+    return autoOrder
+end
+
+-- Remove mods nao permitidos diretamente de um objeto ActiveMods (Lua/Java),
+-- e reordena o que restou - sem envolver leitura/escrita de save em disco.
+-- Usado tanto pelo fix de save existente (autoFixBeforeLoad) quanto pela
+-- criacao de uma nova run BRASILEIRAO (RankGameMode.lua), onde ainda nao
+-- existe save/mods.txt para gravar.
+--
 -- Retorna:
---   nil     -> whitelist ausente (Companion nunca rodou) ou save sem info - nao mexeu em nada
---   {}      -> save ja estava correto
---   { ... } -> lista de mod IDs removidos do save
-function RankModCheck.autoFixBeforeLoad(saveFolder)
+--   nil     -> whitelist ausente ou objeto invalido - nada foi verificado
+--   {}      -> nenhuma violacao encontrada
+--   { ... } -> lista de mod IDs removidos (objeto ja foi corrigido e reordenado)
+function RankModCheck.stripDisallowedFromActiveMods(activeModsObj)
     local whitelist = readWhitelist()
     if not whitelist then return nil end
+    if not activeModsObj then return nil end
 
-    local infoOk, saveInfo = pcall(getSaveInfo, saveFolder)
-    if not infoOk or not saveInfo or not saveInfo.activeMods then
-        RankLog.warn("autoFixBeforeLoad: getSaveInfo indisponivel para '" .. tostring(saveFolder) .. "'")
-        return nil
-    end
-
-    local modListOk, modList = pcall(function() return saveInfo.activeMods:getMods() end)
-    if not modListOk or not modList then
-        RankLog.warn("autoFixBeforeLoad: activeMods:getMods() falhou para '" .. tostring(saveFolder) .. "'")
-        return nil
-    end
+    local modListOk, modList = pcall(function() return activeModsObj:getMods() end)
+    if not modListOk or not modList then return nil end
 
     local violations = findViolationsInJavaList(modList, whitelist)
     if #violations == 0 then return {} end
 
-    local fixOk, fixErr = pcall(function()
-        local currentMods = ActiveMods.getById("currentGame")
-        currentMods:copyFrom(saveInfo.activeMods)
+    local ok = pcall(function()
         for _, id in ipairs(violations) do
-            currentMods:setModActive(id, false)
+            activeModsObj:setModActive(id, false)
         end
-        currentMods:checkMissingMods()
-        currentMods:checkMissingMaps()
-        manipulateSavefile(saveFolder, "WriteModsDotTxt")
+        activeModsObj:checkMissingMods()
+        activeModsObj:checkMissingMaps()
+
+        local remaining = {}
+        local sz = 0
+        pcall(function() sz = activeModsObj:getMods():size() end)
+        for i = 0, sz - 1 do
+            local idOk, id = pcall(function() return activeModsObj:getMods():get(i) end)
+            if idOk and id then remaining[#remaining + 1] = id end
+        end
+
+        local modInfoMap = buildModInfoMap()
+        local reordered = reorderModList(remaining, modInfoMap)
+
+        local modArray = activeModsObj:getMods()
+        modArray:clear()
+        for _, id in ipairs(reordered) do
+            modArray:add(id)
+        end
+    end)
+
+    if not ok then
+        RankLog.error("stripDisallowedFromActiveMods: falha ao aplicar correcao.")
+        return nil
+    end
+
+    return violations
+end
+
+-- Verifica e corrige o mods.txt do save `saveFolder` ANTES do carregamento.
+-- Retorna uma tabela { status = ..., removed = {...} / violations = {...} }:
+--   status = "skip"       -> whitelist ausente ou save sem info - nada foi checado, carregamento segue normal
+--   status = "clean"      -> save ja estava correto, nada a fazer
+--   status = "fixed"      -> violacoes encontradas E corrigidas com sucesso (removed = lista de IDs)
+--   status = "fix_failed" -> violacoes encontradas mas a correcao NAO surtiu efeito (violations = lista de IDs)
+--                            - quem chama deve tratar como inseguro e bloquear o carregamento.
+function RankModCheck.autoFixBeforeLoad(saveFolder)
+    local whitelist = readWhitelist()
+    if not whitelist then return { status = "skip" } end
+
+    local infoOk, saveInfo = pcall(getSaveInfo, saveFolder)
+    if not infoOk or not saveInfo or not saveInfo.activeMods then
+        RankLog.warn("autoFixBeforeLoad: getSaveInfo indisponivel para '" .. tostring(saveFolder) .. "'")
+        return { status = "skip" }
+    end
+
+    -- IMPORTANTE: manipulateSavefile precisa de saveInfo.saveDir, NAO do
+    -- `saveFolder` usado em getSaveInfo(saveFolder) - sao strings diferentes.
+    -- Confirmado lendo o uso oficial em MainScreen.lua (onCheckSavefileModalClick),
+    -- o mesmo fluxo nativo que o jogo usa para corrigir um save com mods invalidos.
+    -- Usar `saveFolder` aqui grava em um caminho errado sem lancar erro nenhum
+    -- (silenciosamente nao aplica a correcao) - ja aconteceu em teste real.
+    local saveDir = saveInfo.saveDir
+    if not saveDir or saveDir == "" then
+        RankLog.error("autoFixBeforeLoad: saveInfo.saveDir ausente para '" .. tostring(saveFolder) .. "' - correcao impossivel.")
+        -- Ainda assim precisamos saber se ha violacoes p/ retornar fix_failed corretamente.
+        local modListOk, modList = pcall(function() return saveInfo.activeMods:getMods() end)
+        local violations = (modListOk and modList) and findViolationsInJavaList(modList, whitelist) or {}
+        if #violations == 0 then return { status = "clean" } end
+        return { status = "fix_failed", violations = violations }
+    end
+
+    local currentMods = ActiveMods.getById("currentGame")
+    local copyOk = pcall(function() currentMods:copyFrom(saveInfo.activeMods) end)
+    if not copyOk then
+        RankLog.error("autoFixBeforeLoad: falha ao copiar activeMods do save.")
+        return { status = "skip" }
+    end
+
+    local violations = RankModCheck.stripDisallowedFromActiveMods(currentMods)
+    if violations == nil then
+        RankLog.error("autoFixBeforeLoad: falha ao aplicar correcao no ActiveMods.")
+        return { status = "skip" }
+    end
+    if #violations == 0 then return { status = "clean" } end
+
+    local fixOk, fixErr = pcall(function()
+        manipulateSavefile(saveDir, "WriteModsDotTxt")
     end)
 
     if not fixOk then
         RankLog.error("autoFixBeforeLoad: falha ao gravar correcao - " .. tostring(fixErr))
-        return nil
+        return { status = "fix_failed", violations = violations }
+    end
+
+    -- Verifica de verdade se a gravacao surtiu efeito antes de reportar sucesso -
+    -- nao confiar so na ausencia de erro (manipulateSavefile pode falhar em
+    -- silencio se o caminho estiver errado).
+    local verifyOk, stillViolating = pcall(function()
+        local freshInfo = getSaveInfo(saveFolder)
+        local freshList = freshInfo and freshInfo.activeMods and freshInfo.activeMods:getMods()
+        return findViolationsInJavaList(freshList, whitelist)
+    end)
+    if not verifyOk or (stillViolating and #stillViolating > 0) then
+        RankLog.error("autoFixBeforeLoad: gravacao nao surtiu efeito - mods ainda presentes apos manipulateSavefile.")
+        return { status = "fix_failed", violations = violations }
     end
 
     RankLog.warn(string.format(
@@ -314,5 +483,5 @@ function RankModCheck.autoFixBeforeLoad(saveFolder)
         #violations, tostring(saveFolder)))
     for _, id in ipairs(violations) do RankLog.warn("  -> removido: " .. id) end
 
-    return violations
+    return { status = "fixed", removed = violations }
 end

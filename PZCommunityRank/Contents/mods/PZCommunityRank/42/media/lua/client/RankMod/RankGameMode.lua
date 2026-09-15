@@ -9,6 +9,7 @@
 
 require "RankMod/RankLog"
 require "RankMod/RankSandbox"
+require "RankMod/RankModCheck"
 
 -- Constantes
 
@@ -158,6 +159,40 @@ NewGameScreen.clickPlay = function(self)
 
         -- Aplica preset apos setDefaultSandboxVars() (chamado dentro do clickPlay)
         applyBrasileiraoPreset()
+
+        -- Remove mods nao permitidos ANTES da run BRASILEIRAO comecar - mesma
+        -- whitelist e mesma logica (strip + reordena load order) usada ao
+        -- carregar um save existente (RankModCheck.autoFixBeforeLoad). Aqui
+        -- ainda nao existe save/mods.txt: corrige direto o ActiveMods
+        -- "currentGame", que e o que o jogo usa para criar o save novo.
+        pcall(function()
+            local currentMods = ActiveMods.getById("currentGame")
+            local removed = RankModCheck.stripDisallowedFromActiveMods(currentMods)
+            if removed == nil then
+                -- Falha ao verificar/corrigir (whitelist ausente e um caso normal,
+                -- ja tratado dentro de stripDisallowedFromActiveMods retornando nil
+                -- silenciosamente so quando a whitelist nao existe - mas erro real
+                -- de aplicacao tambem retorna nil, entao logamos pra nao passar em
+                -- branco). A run comeca mesmo assim - o check() em OnGameStart ainda
+                -- pega qualquer mod nao permitido que tenha escapado.
+                RankLog.warn("RankGameMode: nao foi possivel verificar mods para a nova run (whitelist ausente ou falha).")
+            elseif #removed > 0 then
+                local list = table.concat(removed, ", ")
+                RankLog.warn("RankGameMode: mods removidos antes de iniciar a run BRASILEIRAO - " .. list)
+                pcall(function()
+                    local modal = ISModalDialog:new(
+                        getCore():getScreenWidth() / 2 - 250,
+                        getCore():getScreenHeight() / 2 - 90,
+                        500, 180,
+                        "PZ Community Rank removeu automaticamente mod(s) nao permitido(s) no desafio:\n\n"
+                            .. list .. "\n\nSua nova run comecara sem eles.",
+                        false, nil, nil)
+                    modal:initialise()
+                    modal:addToUIManager()
+                    modal:setAlwaysOnTop(true)
+                end)
+            end
+        end)
 
         -- Volta para Apocalypse: fillList ja rodou em Sandbox (lista populada),
         -- agora clickNext vera getGameMode() != "Sandbox" e vai para char creation
