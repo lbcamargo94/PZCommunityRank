@@ -250,6 +250,22 @@ end
 --  a proxima vez - evita o problema no acesso atual tambem).
 -- ============================================================
 
+-- Verifica se `targetId` esta presente num ArrayList<String> Java
+-- (ex: activeMods:getMods()). Usado para confirmar que um save especifico
+-- realmente inclui o mod, antes de aplicar qualquer correcao nele.
+local function findModIdInJavaList(javaList, targetId)
+    if not javaList then return false end
+    local sz = 0
+    pcall(function() sz = javaList:size() end)
+    for i = 0, sz - 1 do
+        local ok, id = pcall(function() return javaList:get(i) end)
+        if ok and id and tostring(id) == targetId then
+            return true
+        end
+    end
+    return false
+end
+
 -- Retorna a lista de mod IDs violando a whitelist dentro de um
 -- ArrayList<String> Java (ex: activeMods:getMods()).
 local function findViolationsInJavaList(javaList, whitelist)
@@ -426,6 +442,20 @@ function RankModCheck.autoFixBeforeLoad(saveFolder)
         return { status = "skip" }
     end
 
+    local modListOk, modList = pcall(function() return saveInfo.activeMods:getMods() end)
+    if not modListOk or not modList then
+        RankLog.warn("autoFixBeforeLoad: activeMods:getMods() falhou para '" .. tostring(saveFolder) .. "'")
+        return { status = "skip" }
+    end
+
+    -- So aplica a correcao em saves que JA tem PZCommunityRank na propria lista
+    -- de mods. Sem isso, o patch (instalado sempre que o mod esta marcado no
+    -- menu principal de Mods) mexeria em QUALQUER save carregado, mesmo saves
+    -- que nunca incluiram o mod - bug real reportado apos o primeiro release.
+    if not findModIdInJavaList(modList, "PZCommunityRank") then
+        return { status = "skip" }
+    end
+
     -- IMPORTANTE: manipulateSavefile precisa de saveInfo.saveDir, NAO do
     -- `saveFolder` usado em getSaveInfo(saveFolder) - sao strings diferentes.
     -- Confirmado lendo o uso oficial em MainScreen.lua (onCheckSavefileModalClick),
@@ -435,9 +465,7 @@ function RankModCheck.autoFixBeforeLoad(saveFolder)
     local saveDir = saveInfo.saveDir
     if not saveDir or saveDir == "" then
         RankLog.error("autoFixBeforeLoad: saveInfo.saveDir ausente para '" .. tostring(saveFolder) .. "' - correcao impossivel.")
-        -- Ainda assim precisamos saber se ha violacoes p/ retornar fix_failed corretamente.
-        local modListOk, modList = pcall(function() return saveInfo.activeMods:getMods() end)
-        local violations = (modListOk and modList) and findViolationsInJavaList(modList, whitelist) or {}
+        local violations = findViolationsInJavaList(modList, whitelist)
         if #violations == 0 then return { status = "clean" } end
         return { status = "fix_failed", violations = violations }
     end
