@@ -177,15 +177,18 @@ NewGameScreen.clickPlay = function(self)
                 -- pega qualquer mod nao permitido que tenha escapado.
                 RankLog.warn("RankGameMode: nao foi possivel verificar mods para a nova run (whitelist ausente ou falha).")
             elseif #removed > 0 then
-                local list = table.concat(removed, ", ")
-                RankLog.warn("RankGameMode: mods removidos antes de iniciar a run BRASILEIRAO - " .. list)
+                RankLog.warn("RankGameMode: mods removidos antes de iniciar a run BRASILEIRAO - " .. table.concat(removed, ", "))
                 pcall(function()
+                    -- x=0,y=0 centraliza com base no tamanho REAL da caixa
+                    -- (ISModalDialog.CalcSize); lista formatada via
+                    -- RankModCheck.formatModListForModal evita uma linha unica
+                    -- gigante - ambos necessarios pra lista longa nao empurrar
+                    -- o botao OK pra fora da tela.
                     local modal = ISModalDialog:new(
-                        getCore():getScreenWidth() / 2 - 250,
-                        getCore():getScreenHeight() / 2 - 90,
+                        0, 0,
                         500, 180,
                         "PZ Community Rank removeu automaticamente mod(s) nao permitido(s) no desafio:\n\n"
-                            .. list .. "\n\nSua nova run comecara sem eles.",
+                            .. RankModCheck.formatModListForModal(removed) .. "\n\nSua nova run comecara sem eles.",
                         false, nil, nil)
                     modal:initialise()
                     modal:addToUIManager()

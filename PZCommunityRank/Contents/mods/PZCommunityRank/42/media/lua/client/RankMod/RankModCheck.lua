@@ -21,6 +21,48 @@ RankModCheck = {}
 
 local WHITELIST_FILE = "pz_rank/pz_rank_allowed_mods.txt"
 
+-- Maximo de mods listados por extenso na modal - com mais que isso, o restante
+-- vira "e mais N mod(s)" pra nao deixar a caixa gigantesca em altura.
+local MODAL_MAX_LISTED_MODS = 15
+
+-- Monta o texto da lista de mods pronto pra entrar numa ISModalDialog: quebra
+-- em varias linhas (medindo largura real do texto, igual ISModalDialog.CalcSize
+-- faz) e trunca a partir de MODAL_MAX_LISTED_MODS. Sem isso, uma lista longa
+-- vira UMA linha so, ISModalDialog.CalcSize nao faz word-wrap e a caixa cresce
+-- em largura (e altura, se muitas linhas) alem da tela, empurrando o botao OK
+-- pra fora da area visivel/clicavel.
+function RankModCheck.formatModListForModal(modIds)
+    local shown = modIds
+    local extra = 0
+    if #modIds > MODAL_MAX_LISTED_MODS then
+        shown = {}
+        for i = 1, MODAL_MAX_LISTED_MODS do shown[i] = modIds[i] end
+        extra = #modIds - MODAL_MAX_LISTED_MODS
+    end
+
+    local maxWidthPx = math.min(700, getCore():getScreenWidth() - 160)
+    local tm = getTextManager()
+    local lines = {}
+    local current = ""
+    for i, id in ipairs(shown) do
+        local sep = (i < #shown) and ", " or ""
+        local candidate = current .. id .. sep
+        if current ~= "" and tm:MeasureStringX(UIFont.Small, candidate) > maxWidthPx then
+            table.insert(lines, current)
+            current = id .. sep
+        else
+            current = candidate
+        end
+    end
+    if current ~= "" then table.insert(lines, current) end
+
+    if extra > 0 then
+        lines[#lines + 1] = "(e mais " .. extra .. " mod(s)...)"
+    end
+
+    return table.concat(lines, "\n")
+end
+
 -- IDs que sempre aparecem em getActiveMods() mas nao precisam ser autorizados:
 --   base / Base / pzexo  = IDs internos do PZ engine
 --   PZCommunityRank      = o proprio mod do desafio (sempre obrigatorio, nao cadastrado no site)

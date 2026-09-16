@@ -39,9 +39,13 @@ pcall(function()
     local function showModal(msg, onOk)
         local created = false
         pcall(function()
+            -- x=0,y=0 faz a ISModalDialog se auto-centralizar com base no
+            -- tamanho REAL calculado pro texto (ISModalDialog.CalcSize), em vez
+            -- de uma posicao fixa calculada supondo uma caixa pequena - com
+            -- lista de mods longa a caixa cresce e uma posicao fixa deixa o
+            -- botao OK fora da tela.
             local modal = ISModalDialog:new(
-                getCore():getScreenWidth() / 2 - 250,
-                getCore():getScreenHeight() / 2 - 90,
+                0, 0,
                 500, 180, msg, false, nil,
                 onOk and function() onOk() end or nil)
             modal:initialise()
@@ -63,13 +67,13 @@ pcall(function()
             if not result then return end
 
             if result.status == "fixed" and result.removed and #result.removed > 0 then
-                pending = { kind = "info", list = table.concat(result.removed, ", ") }
+                pending = { kind = "info", list = RankModCheck.formatModListForModal(result.removed) }
             elseif result.status == "fix_failed" and result.violations and #result.violations > 0 then
                 -- A correcao nao surtiu efeito (gravacao falhou ou nao foi confirmada).
                 -- Carregar mesmo assim deixaria o jogador com mod(s) nao permitido(s)
                 -- ativo(s) sem deteccao previa - mais seguro bloquear o carregamento
                 -- do que arriscar uma correcao que nao foi verificada.
-                pending = { kind = "blocked", list = table.concat(result.violations, ", ") }
+                pending = { kind = "blocked", list = RankModCheck.formatModListForModal(result.violations) }
             end
         end)
 

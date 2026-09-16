@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.21.0 - feat: reordena load order dos mods restantes (require=/loadafter=/loadbefore=) apos remover mods bloqueados; bloqueia carregamento se a correcao falhar; aviso na tela agora espera confirmacao (OK) antes de continuar; mesma correcao aplicada tambem ao iniciar uma nova run BRASILEIRAO PZ."
+	"changenote"		"v2.21.2 - fix: a caixa de aviso de mods removidos crescia demais com listas longas (mais de ~8 mods), empurrando o botao OK pra fora da tela e travando o jogador. Lista agora quebra em varias linhas e trunca em 15 itens (e mais N...); caixa se centraliza com base no tamanho real calculado."
 }
