@@ -100,38 +100,6 @@ local function checkAndDisqualify(player)
     return presetOk
 end
 
--- Verifica se o Companion sinalizou limpeza de violacao via arquivo.
--- Se encontrado com conteudo "clear": limpa flags de ModData e em memoria,
--- depois marca o arquivo como consumido para nao repetir na proxima sessao.
-local function checkClearViolationFile(player)
-    local content = nil
-    local rOk, r = pcall(function() return getFileReader("pz_rank/pz_rank_clear_violation.txt", false) end)
-    if rOk and r then
-        pcall(function() content = r:readLine() end)
-        pcall(function() r:close() end)
-    end
-    if content ~= "clear" then return end
-
-    pcall(function()
-        local md = player:getModData()
-        md["PZCommunityRank_SandboxViolation"] = nil
-        md["PZCommunityRank_DebugViolation"]   = nil
-        md["PZCommunityRank_ModViolation"]     = nil
-        -- Reseta o timestamp de horas para que o gap nao dispare novamente na proxima carga
-        md["PZCommunityRank_LastSyncHours"]    = player:getHoursSurvived()
-    end)
-    _sandboxViolationDetected = false
-    _debugViolationDetected   = false
-    _modViolationDetected     = false
-    _modViolationList         = {}
-
-    pcall(function()
-        local w = getFileWriter("pz_rank/pz_rank_clear_violation.txt", false, false)
-        if w then w:write("done") w:close() end
-    end)
-    RankLog.warn("checkClearViolationFile: violacoes limpas via sinal do Companion.")
-end
-
 -- Retorna true se o save atual e um jogo do desafio Brasileirao.
 -- Usa ModData (PZCommunityRank_IsChallenge) para distinguir de sessoes genéricas.
 local function isBrasileiraoGame(player)
@@ -470,8 +438,6 @@ local function onGameStart()
             end)
 
             -- Detecta gap de horas jogadas sem o mod ativo (bypass via desativacao do mod).
-            -- Deve rodar ANTES de checkClearViolationFile para que o clear do moderador
-            -- possa resetar o gap (LastSyncHours) e evitar re-flag na proxima carga.
             pcall(function()
                 local p2 = getPlayer()
                 if not p2 then return end
@@ -487,13 +453,6 @@ local function onGameStart()
                         "OnGameStart: %.1fh sem mod detectado (last=%.2f atual=%.2f) - DESCLASSIFICADO.",
                         gap, lastKnownHours, currentHours))
                 end
-            end)
-
-            -- Verifica se o Companion sinalizou limpeza de violacao.
-            -- Deve rodar APOS o gap check para poder sobrescrever flags e resetar LastSyncHours.
-            pcall(function()
-                local p2 = getPlayer()
-                if p2 then checkClearViolationFile(p2) end
             end)
 
             -- Reaplica o preset completo (SandboxVars + Java SandboxOptions).
@@ -1733,4 +1692,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.21.2")
+RankLog.info("Mod carregado - B42.20 | v2.22.0")

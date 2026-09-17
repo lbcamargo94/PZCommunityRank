@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.21.2 - fix: a caixa de aviso de mods removidos crescia demais com listas longas (mais de ~8 mods), empurrando o botao OK pra fora da tela e travando o jogador. Lista agora quebra em varias linhas e trunca em 15 itens (e mais N...); caixa se centraliza com base no tamanho real calculado."
+	"changenote"		"v2.22.0 - fix de seguranca IMPORTANTE: removido o mecanismo de 'limpar violacao' local (arquivo pz_rank_clear_violation.txt). Ele permitia que o proprio jogador apagasse sinais de desclassificacao (debug, sandbox, mod nao permitido) direto no Companion, sem nenhuma aprovacao de moderador - se feito antes do servidor confirmar a desclassificacao, a violacao nunca chegava a ser registrada. Agora desclassificacoes so podem ser revertidas por um moderador (painel do site)."
 }
