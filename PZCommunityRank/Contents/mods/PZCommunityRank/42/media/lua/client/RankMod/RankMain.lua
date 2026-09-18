@@ -1585,6 +1585,44 @@ pcall(function()
     end)
 end)
 
+-- -- Reduz livros de skill em zumbis mortos (desafio) --------
+-- O slider de sandbox (SkillBookLoot) nao reduz livros carregados por
+-- zumbis de forma parcial - o motor do jogo neutraliza esse multiplicador
+-- pra itens "junk" (ItemPickerJava.getLootModifier: se isJunk e o
+-- modificador > 0, ele vira 1.0, ignorando o slider). Por isso a reducao
+-- e feita aqui, removendo o item do inventario do zumbi ja morto, com uma
+-- chance fixa - roda so uma vez por zumbi, logo depois do jogo gerar o
+-- loot real (DoZombieInventory), antes do jogador poder saquear.
+local SKILL_BOOK_REMOVAL_CHANCE = 98 -- % de chance de remover cada livro de skill encontrado
+
+pcall(function()
+    Events.OnZombieDead.Add(function(zombie)
+        if _isStartingUp then return end
+        if isClient() then return end -- so o lado autoritativo (servidor/SP) gera loot de verdade
+
+        local ok, player = pcall(getPlayer)
+        if not ok or not player then return end
+        if not isBrasileiraoGame(player) then return end
+
+        local okInv, inv = pcall(function() return zombie:getInventory() end)
+        if not okInv or not inv then return end
+
+        local okItems, items = pcall(function() return inv:getItems() end)
+        if not okItems or not items then return end
+
+        for i = items:size() - 1, 0, -1 do
+            local item = items:get(i)
+            local okLit, isLit = pcall(function() return item:IsLiterature() end)
+            if okLit and isLit then
+                local okCat, category = pcall(function() return item:getDisplayCategory() end)
+                if okCat and category == "SkillBook" and ZombRand(100) < SKILL_BOOK_REMOVAL_CHANCE then
+                    pcall(function() inv:Remove(item) end)
+                end
+            end
+        end
+    end)
+end)
+
 -- -- Atualizacao a cada novo dia no jogo --------------------
 pcall(function()
     Events.EveryDays.Add(function()
@@ -1692,4 +1730,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.22.0")
+RankLog.info("Mod carregado - B42.20 | v2.23.0")
