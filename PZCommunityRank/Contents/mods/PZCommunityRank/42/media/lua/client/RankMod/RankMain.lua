@@ -1585,40 +1585,83 @@ pcall(function()
     end)
 end)
 
--- -- Reduz livros de skill em zumbis mortos (desafio) --------
+-- -- Reduz livros de skill no loot de cadaveres de zumbi (desafio) --------
 -- O slider de sandbox (SkillBookLoot) nao reduz livros carregados por
 -- zumbis de forma parcial - o motor do jogo neutraliza esse multiplicador
 -- pra itens "junk" (ItemPickerJava.getLootModifier: se isJunk e o
 -- modificador > 0, ele vira 1.0, ignorando o slider). Por isso a reducao
--- e feita aqui, removendo o item do inventario do zumbi ja morto, com uma
--- chance fixa - roda so uma vez por zumbi, logo depois do jogo gerar o
--- loot real (DoZombieInventory), antes do jogador poder saquear.
+-- e feita aqui, removendo o livro do cadaver (e das mochilas dele) com uma
+-- chance fixa, logo depois do jogo preencher o container (OnFillContainer) e
+-- antes do jogador poder saquear.
 local SKILL_BOOK_REMOVAL_CHANCE = 98 -- % de chance de remover cada livro de skill encontrado
+local SKILL_BOOK_MAX_CONTAINER_DEPTH = 4 -- limite de recursao em containers aninhados (mochila dentro de mochila etc.)
 
+-- Percorre um ItemContainer removendo livros de skill (com chance) e descendo
+-- recursivamente em qualquer item que seja ele mesmo um container (mochila,
+-- bolsa, etc. usada/carregada pelo zumbi) - o inventario de nivel superior
+-- do zumbi (zombie:getInventory()) NAO inclui automaticamente o conteudo de
+-- containers aninhados, entao sem essa recursao os livros dentro de mochilas
+-- nunca eram alcancados (confirmado: "aparecendo muitos livros nas mochilas"
+-- apos o primeiro teste ao vivo, so olhando o nivel superior).
+local function stripSkillBooksFromContainer(inv, depth, stats)
+    if not inv or depth > SKILL_BOOK_MAX_CONTAINER_DEPTH then return end
+    local okItems, items = pcall(function() return inv:getItems() end)
+    if not okItems or not items then return end
+
+    for i = items:size() - 1, 0, -1 do
+        local item = items:get(i)
+        local okLit, isLit = pcall(function() return item:IsLiterature() end)
+        if okLit and isLit then
+            local okCat, category = pcall(function() return item:getDisplayCategory() end)
+            if okCat and category == "SkillBook" then
+                stats.seen = stats.seen + 1
+                if ZombRand(100) < SKILL_BOOK_REMOVAL_CHANCE then
+                    if pcall(function() inv:Remove(item) end) then
+                        stats.removed = stats.removed + 1
+                    end
+                end
+            end
+        else
+            -- Nao e literatura - pode ser uma mochila/bolsa com seu proprio
+            -- container interno. getInventory() SO existe em InventoryContainer:
+            -- chamar em qualquer outro item da "Tried to call nil" e o jogo
+            -- loga um stack trace inteiro mesmo dentro de pcall - com dezenas de
+            -- zumbis juntos isso inundou o log e travou o jogo (teste ao vivo:
+            -- 50 sobreviventes). Por isso checa IsInventoryContainer() ANTES.
+            local okIsCont, isCont = pcall(function() return item:IsInventoryContainer() end)
+            if okIsCont and isCont then
+                local okNested, nestedInv = pcall(function() return item:getInventory() end)
+                if okNested and nestedInv then
+                    stripSkillBooksFromContainer(nestedInv, depth + 1, stats)
+                end
+            end
+        end
+    end
+end
+
+-- O conteudo do cadaver (e das mochilas nele) so e gerado quando o container
+-- e preenchido (ItemPickerJava.fillContainer, ao abrir/carregar o cadaver) -
+-- DEPOIS do OnZombieDead, entao la as mochilas estao vazias. Ao terminar de
+-- preencher, o jogo dispara OnFillContainer("Zombie", outfit, container) com o
+-- ItemContainer do cadaver ja com as mochilas cheias: e aqui que removemos.
+-- (O ramo "Zombie Bag" passa uma tabela de distribuicao em vez do container,
+-- por isso so tratamos "Zombie".)
 pcall(function()
-    Events.OnZombieDead.Add(function(zombie)
+    Events.OnFillContainer.Add(function(roomName, containerType, container)
+        if roomName ~= "Zombie" then return end
         if _isStartingUp then return end
         if isClient() then return end -- so o lado autoritativo (servidor/SP) gera loot de verdade
+        if not container then return end
 
         local ok, player = pcall(getPlayer)
         if not ok or not player then return end
         if not isBrasileiraoGame(player) then return end
 
-        local okInv, inv = pcall(function() return zombie:getInventory() end)
-        if not okInv or not inv then return end
-
-        local okItems, items = pcall(function() return inv:getItems() end)
-        if not okItems or not items then return end
-
-        for i = items:size() - 1, 0, -1 do
-            local item = items:get(i)
-            local okLit, isLit = pcall(function() return item:IsLiterature() end)
-            if okLit and isLit then
-                local okCat, category = pcall(function() return item:getDisplayCategory() end)
-                if okCat and category == "SkillBook" and ZombRand(100) < SKILL_BOOK_REMOVAL_CHANCE then
-                    pcall(function() inv:Remove(item) end)
-                end
-            end
+        local stats = { seen = 0, removed = 0 }
+        stripSkillBooksFromContainer(container, 0, stats)
+        if stats.seen > 0 then
+            RankLog.info(string.format(
+                "Livros de skill em cadaver: vistos=%d removidos=%d", stats.seen, stats.removed))
         end
     end)
 end)
@@ -1730,4 +1773,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.23.0")
+RankLog.info("Mod carregado - B42.20 | v2.23.1")

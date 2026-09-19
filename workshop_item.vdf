@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.23.0 - reduz drasticamente (98% de chance) livros de skill no inventario de zumbis mortos, durante o desafio Brasileirao. O slider de sandbox (SkillBookLoot) nao reduz livros carregados por zumbis de forma parcial - o jogo neutraliza esse multiplicador pra itens de bolso de zumbi. Corrigido removendo o livro diretamente do inventario do zumbi apos a morte, com chance configurada. So livros de skill (revistas/jornais/quadrinhos continuam normais)."
+	"changenote"		"v2.23.1 - livros de skill agora sao reduzidos de fato no loot de zumbis (98% de chance de remover) durante o desafio Brasileirao. O slider de sandbox nao funciona pra itens de bolso/mochila de zumbi (o jogo neutraliza o multiplicador), e o conteudo das mochilas so e gerado ao abrir o cadaver - por isso a remocao roda em OnFillContainer, descendo nas mochilas. Testado ao vivo: 7 de 7 livros removidos. So livros de skill; revistas, jornais e quadrinhos continuam normais."
 }
