@@ -1593,7 +1593,7 @@ end)
 -- e feita aqui, removendo o livro do cadaver (e das mochilas dele) com uma
 -- chance fixa, logo depois do jogo preencher o container (OnFillContainer) e
 -- antes do jogador poder saquear.
-local SKILL_BOOK_REMOVAL_CHANCE = 98 -- % de chance de remover cada livro de skill encontrado
+local SKILL_BOOK_REMOVAL_CHANCE = 95 -- % de chance de remover cada livro de skill encontrado (5% sobrevive)
 local SKILL_BOOK_MAX_CONTAINER_DEPTH = 4 -- limite de recursao em containers aninhados (mochila dentro de mochila etc.)
 
 -- Percorre um ItemContainer removendo livros de skill (com chance) e descendo
@@ -1773,4 +1773,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.23.1")
+RankLog.info("Mod carregado - B42.20 | v2.23.2")

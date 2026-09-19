@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.23.1 - livros de skill agora sao reduzidos de fato no loot de zumbis (98% de chance de remover) durante o desafio Brasileirao. O slider de sandbox nao funciona pra itens de bolso/mochila de zumbi (o jogo neutraliza o multiplicador), e o conteudo das mochilas so e gerado ao abrir o cadaver - por isso a remocao roda em OnFillContainer, descendo nas mochilas. Testado ao vivo: 7 de 7 livros removidos. So livros de skill; revistas, jornais e quadrinhos continuam normais."
+	"changenote"		"v2.23.2 - ajuste de balanceamento: chance de um livro de skill de zumbi sobreviver subiu de 2% para 5% (remocao de 98% para 95%). So livros de skill, so no desafio Brasileirao."
 }
