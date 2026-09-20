@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.23.2 - ajuste de balanceamento: chance de um livro de skill de zumbi sobreviver subiu de 2% para 5% (remocao de 98% para 95%). So livros de skill, so no desafio Brasileirao."
+	"changenote"		"v2.24.0 - revertido o nerf de livros de skill em zumbis (introduzido na v2.23.0-v2.23.2). Comunidade nao gostou da mudanca de balanceamento. Livros de skill voltam a cair em zumbis normalmente, sem nenhuma reducao adicional do mod - so o slider padrao de sandbox do desafio continua valendo."
 }
