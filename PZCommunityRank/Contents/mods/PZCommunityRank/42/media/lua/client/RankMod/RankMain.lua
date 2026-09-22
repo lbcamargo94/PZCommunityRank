@@ -1143,17 +1143,29 @@ if not _seedPatched then
 end
 
 -- Ovos coletados (B42.20: ISHutchGrabEgg substituiu ISCollectEgg)
+-- Fix: o :perform() so dispara UMA vez ao fim de toda a acao de coletar (que pode
+-- pegar varios ovos ao longo de :update()), entao contava "1 acao" em vez de "N ovos"
+-- — e em builds onde o :perform() nao reflete exatamente o fim bem-sucedido, contava
+-- 0. Patch movido pra :update(), medindo a queda real de ovos no ninho (getEggsNb())
+-- a cada tick — cada ovo de fato removido incrementa o contador uma vez.
 local _eggPatched = false
 pcall(function()
     require "TimedActions/Animals/ISHutchGrabEgg"
-    if ISHutchGrabEgg and ISHutchGrabEgg.perform and not ISHutchGrabEgg._pzRankPatched then
-        local origEgg = ISHutchGrabEgg.perform
-        ISHutchGrabEgg.perform = function(self)
-            local result = origEgg(self)
+    if ISHutchGrabEgg and ISHutchGrabEgg.update and not ISHutchGrabEgg._pzRankPatched then
+        local origEgg = ISHutchGrabEgg.update
+        ISHutchGrabEgg.update = function(self)
+            local before = 0
+            pcall(function() if self.nestbox then before = self.nestbox:getEggsNb() end end)
+            origEgg(self)
             if self and self.character and isLocalPlayer(self.character) then
-                incModCounter("PZCommunityRank_EggsCollected")
+                pcall(function()
+                    if not self.nestbox then return end
+                    local after = self.nestbox:getEggsNb()
+                    if after < before then
+                        for _ = 1, (before - after) do incModCounter("PZCommunityRank_EggsCollected") end
+                    end
+                end)
             end
-            return result
         end
         ISHutchGrabEgg._pzRankPatched = true
         _eggPatched = true
@@ -1167,17 +1179,31 @@ if not _eggPatched then
 end
 
 -- Leite produzido (B42: ordenha manual de animais)
+-- Fix: a producao real acontece dentro de :milk() (chamada varias vezes por sessao
+-- de ordenha via :update()), que pode terminar via forceStop() em vez do fluxo normal
+-- complete()->perform() — o :perform() antigo podia nunca disparar mesmo com leite
+-- de verdade produzido. Patch movido pra :milk(), medindo a queda real de leite no
+-- animal (getMilkQuantity()) a cada chamada — so incrementa quando ha extracao real
+-- (os retornos antecipados de :milk() por estresse/balde cheio/sem leite acontecem
+-- ANTES da extracao, entao nunca reduzem a quantidade do animal).
 local _milkPatched = false
 pcall(function()
     require "TimedActions/Animals/ISMilkAnimal"
-    if ISMilkAnimal and ISMilkAnimal.perform and not ISMilkAnimal._pzRankPatched then
-        local origMilk = ISMilkAnimal.perform
-        ISMilkAnimal.perform = function(self)
-            local result = origMilk(self)
-            if result ~= false and self and self.character and isLocalPlayer(self.character) then
-                incModCounter("PZCommunityRank_MilkProduced")
+    if ISMilkAnimal and ISMilkAnimal.milk and not ISMilkAnimal._pzRankPatched then
+        local origMilk = ISMilkAnimal.milk
+        ISMilkAnimal.milk = function(self)
+            local before = 0
+            pcall(function() if self.animal then before = self.animal:getData():getMilkQuantity() end end)
+            origMilk(self)
+            if self and self.character and isLocalPlayer(self.character) then
+                pcall(function()
+                    if not self.animal then return end
+                    local after = self.animal:getData():getMilkQuantity()
+                    if after < before then
+                        incModCounter("PZCommunityRank_MilkProduced")
+                    end
+                end)
             end
-            return result
         end
         ISMilkAnimal._pzRankPatched = true
         _milkPatched = true
@@ -1663,4 +1689,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.25.0")
+RankLog.info("Mod carregado - B42.20 | v2.25.1")

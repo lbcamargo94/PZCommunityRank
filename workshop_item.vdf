@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.25.0 - Correcao de 10 estatisticas de conquistas que ficavam sempre zeradas: itens fabricados, armas forjadas, ceramica, refeicoes cozidas, materiais, roupas, queijo e estacoes usadas dependiam de um evento de crafting que nao existe no B42 - trocado por patch direto na acao real de crafting (ISCraftAction). Corrigido tambem o contador de horas sem dormir, que so comecava a contar depois do primeiro sono - quem nunca dormia (o objetivo das conquistas Insone/Sem Sono) nunca acumulava nada."
+	"changenote"		"v2.25.1 - Corrige contagem de ovos coletados e leite produzido. Os patches antigos contavam no fim da acao (.perform), que podia nao disparar em todos os casos e so contava 1 por acao em vez de 1 por ovo/litro. Agora medem a mudanca real de estado (ovos no ninho, leite no animal) a cada extracao, igual ao criterio das conquistas Primeiros Ovos e Ordenhador."
 }
