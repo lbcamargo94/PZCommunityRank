@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.25.3 - Adiciona log de diagnostico temporario (sem impacto no jogo) para descobrir o nome real da zona/comodo da base militar - as palavras-chave atuais (armory/barracks/guardpost) nao foram confirmadas contra o jogo real. Sera usado para corrigir a deteccao de forma precisa numa proxima versao."
+	"changenote"		"v2.25.4 - Corrige conquista de casas saqueadas, que nunca incrementava (confirmado: 0 em 997 personagens de producao). O evento usado antes (OnContainerUpdate) so dispara quando um container e adicionado/removido do mundo, nao ao abrir moveis existentes de uma casa. Agora conta via ISInventoryTransferAction, disparado pelo proprio jogo sempre que um item sai de fato de um container."
 }

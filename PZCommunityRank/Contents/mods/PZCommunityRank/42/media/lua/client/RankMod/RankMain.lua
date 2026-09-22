@@ -896,41 +896,63 @@ if not _craftPatched then
     end, "Itens fabricados (evento, fallback)")
 end
 
--- Casas saqueadas: conta prédios únicos onde o jogador abriu um container.
--- Usa um set de IDs de building em ModData para evitar contar o mesmo prédio duas vezes.
-addOptionalEvent("OnContainerUpdate", function(container)
-        -- B42.20 tambem dispara OnContainerUpdate sem argumento ao atualizar
-        -- portas e outros objetos do mundo.
-        if not container or not instanceof(container, "ItemContainer") then return end
-        local ok, player = pcall(getPlayer)
-        if not ok or not player then return end
-        -- Obtém o building ID: bld:getDef():hashCode() é cadeia perigosa —
-        -- getDef() chamado duas vezes no mesmo pcall; se retornar null Java
-        -- a segunda chamada lança RuntimeException que escapa pcall único.
-        local bldId = nil
-        pcall(function()
-            local parent = container:getParent()
-            local sq = parent and parent:getSquare()
-            if not sq then return end
-            local sqBldOk, bld = pcall(function() return sq:getBuilding() end)
-            if not sqBldOk or not bld then return end
-            local defOk, def = pcall(function() return bld:getDef() end)
-            if not defOk or not def then return end
-            local hashOk, hash = pcall(function() return def:hashCode() end)
-            if hashOk and hash then bldId = tostring(hash) end
-        end)
-        local bldOk = bldId ~= nil
-        if not bldOk or not bldId then return end
-        local mdOk, md = pcall(function() return player:getModData() end)
-        if not mdOk or not md then return end
-        local setKey = "PZCommunityRank_LootedBldSet"
-        local tag = "|" .. bldId .. "|"
-        if _lootedBldCache[bldId] then return end
-        _lootedBldCache[bldId] = true
-        -- Novo prédio — registra e incrementa
-        md[setKey] = (md[setKey] or "") .. tag
-        md["PZCommunityRank_HousesLooted"] = (tonumber(md["PZCommunityRank_HousesLooted"]) or 0) + 1
+-- Casas saqueadas: conta prédios únicos onde o jogador retirou um item de um
+-- container. OnContainerUpdate NAO e confiavel pra isso — dispara ao
+-- adicionar/remover o CONTAINER do mundo (fogueira, foraging global sem
+-- argumento — ver forageSystem.lua) e praticamente nunca ao simplesmente abrir
+-- um movel ja existente numa casa. Confirmado em producao: 0 em 997 entries,
+-- sempre zero, nunca incrementou uma unica vez.
+-- Fix: patch em ISInventoryTransferAction:transferItem — chamado pelo proprio
+-- motor toda vez que um item sai de fato de um container (o jogo marca
+-- srcContainer:setHasBeenLooted(true) nesse exato ponto, a fonte oficial
+-- desse conceito — ver ISInventoryTransferAction.lua).
+local _lootPatched = false
+pcall(function()
+    require "TimedActions/ISInventoryTransferAction"
+    if ISInventoryTransferAction and ISInventoryTransferAction.transferItem and not ISInventoryTransferAction._pzRankPatched then
+        local origTransfer = ISInventoryTransferAction.transferItem
+        ISInventoryTransferAction.transferItem = function(self, item)
+            origTransfer(self, item)
+            if not (self and self.character and isLocalPlayer(self.character) and self.srcContainer) then return end
+            pcall(function()
+                -- so conta looting de container fixo do mundo (moveis/prateleiras
+                -- de uma casa) — ignora inventario do proprio jogador e o chao.
+                if self.srcContainer:isInCharacterInventory(self.character) then return end
+                if self.srcContainer:getType() == "floor" then return end
+                -- Obtém o building ID: bld:getDef():hashCode() é cadeia perigosa —
+                -- getDef() chamado duas vezes no mesmo pcall; se retornar null Java
+                -- a segunda chamada lança RuntimeException que escapa pcall único.
+                local bldId = nil
+                pcall(function()
+                    local parent = self.srcContainer:getParent()
+                    local sq = parent and parent:getSquare()
+                    if not sq then return end
+                    local sqBldOk, bld = pcall(function() return sq:getBuilding() end)
+                    if not sqBldOk or not bld then return end
+                    local defOk, def = pcall(function() return bld:getDef() end)
+                    if not defOk or not def then return end
+                    local hashOk, hash = pcall(function() return def:hashCode() end)
+                    if hashOk and hash then bldId = tostring(hash) end
+                end)
+                if not bldId then return end
+                if _lootedBldCache[bldId] then return end
+                _lootedBldCache[bldId] = true
+                local ok2, player = pcall(getPlayer)
+                if not ok2 or not player then return end
+                local mdOk, md = pcall(function() return player:getModData() end)
+                if not mdOk or not md then return end
+                md["PZCommunityRank_LootedBldSet"] = (md["PZCommunityRank_LootedBldSet"] or "") .. "|" .. bldId .. "|"
+                md["PZCommunityRank_HousesLooted"] = (tonumber(md["PZCommunityRank_HousesLooted"]) or 0) + 1
+            end)
+        end
+        ISInventoryTransferAction._pzRankPatched = true
+        _lootPatched = true
+        RankLog.info("Casas saqueadas: patch instalado (ISInventoryTransferAction).")
+    end
 end)
+if not _lootPatched then
+    RankLog.warn("Casas saqueadas: ISInventoryTransferAction indisponivel nesta build - stat ficara zerado.")
+end
 
 -- Horas sem dormir (pico): atualizado a cada tick periódico e ao adormecer.
 -- Ao acordar, o pico NÃO é resetado — queremos o recorde acumulado da run.
@@ -1722,4 +1744,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.25.3")
+RankLog.info("Mod carregado - B42.20 | v2.25.4")
