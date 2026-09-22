@@ -746,12 +746,32 @@ addFirstAvailableEvent({ "OnPlayerFishCaught", "OnFishCaught" }, function(player
     recordFishCaught(player)
 end, "Peixes capturados")
 
--- Vegetais colhidos (B42 usa OnPlantHarvested ou OnFarmPlantHarvested)
-addFirstAvailableEvent({ "OnPlantHarvested", "OnFarmPlantHarvested" }, function(first, second)
-    local player = second or first
-    if not player or not isLocalPlayer(player) then return end
-    incModCounter("PZCommunityRank_CropsHarvested")
-end, "Vegetais colhidos")
+-- Vegetais colhidos: OnPlantHarvested/OnFarmPlantHarvested NAO EXISTEM no B42
+-- (confirmado: zero ocorrencias em todo o media/lua do jogo real) — o contador
+-- nunca disparava. Confirmado em producao: 0 em 100% das entries, sempre.
+-- Fix: patch em ISHarvestPlantAction:complete() — a TimedAction real usada
+-- por toda colheita de planta cultivada (chama SFarmingSystem.instance:harvest()
+-- internamente; complete() so roda quando a colheita de fato aconteceu).
+local _harvestPatched = false
+pcall(function()
+    require "Farming/TimedActions/ISHarvestPlantAction"
+    if ISHarvestPlantAction and ISHarvestPlantAction.complete and not ISHarvestPlantAction._pzRankPatched then
+        local origHarvest = ISHarvestPlantAction.complete
+        ISHarvestPlantAction.complete = function(self)
+            local result = origHarvest(self)
+            if self and self.character and isLocalPlayer(self.character) then
+                incModCounter("PZCommunityRank_CropsHarvested")
+            end
+            return result
+        end
+        ISHarvestPlantAction._pzRankPatched = true
+        _harvestPatched = true
+        RankLog.info("Vegetais colhidos: patch instalado (ISHarvestPlantAction).")
+    end
+end)
+if not _harvestPatched then
+    RankLog.warn("Vegetais colhidos: ISHarvestPlantAction indisponivel nesta build - stat ficara zerado.")
+end
 
 -- Itens fabricados via receita (crafting) + categorizacao (ceramica, forja,
 -- refeicoes, materiais, roupas, armas, queijo, estacoes usadas).
@@ -981,34 +1001,62 @@ local function updateHoursWithoutSleep()
     end
 end
 
--- Registra o horário de última sonecada para o cálculo de fallback
-addFirstAvailableEvent({ "OnPlayerStartSleeping", "OnPlayerSleep" }, function(player)
+-- OnPlayerStartSleeping/OnPlayerSleep NAO EXISTEM no B42 (confirmado: zero
+-- ocorrencias em todo o media/lua do jogo real) — addFirstAvailableEvent
+-- registrava um callback que nunca era chamado, entao NEM updateHoursWithoutSleep()
+-- NEM o rastreio de locais de sono jamais rodavam, pra ninguem, mesmo apos o
+-- lazy-init da v2.25.0 (que corrigia a logica interna de uma funcao que
+-- seguia inalcancavel). Confirmado em producao: hours_without_sleep e
+-- sleep_locations em 0 em 100% das entries, sempre.
+-- Fix: poll via OnTick usando player:isAsleep() (API real, ver ISSleepingUI.lua)
+-- pra detectar a transicao acordado->dormindo, e chama updateHoursWithoutSleep()
+-- a cada ciclo independente de estar dormindo — e o unico jeito de capturar
+-- quem literalmente nunca dorme (exatamente o alvo da conquista).
+local _sleepCheckTick = 0
+local SLEEP_CHECK_TICKS = 300  -- ~5s a 60fps
+local _wasAsleep = false
+addOptionalEvent("OnTick", function()
+    _sleepCheckTick = _sleepCheckTick + 1
+    if _sleepCheckTick < SLEEP_CHECK_TICKS then return end
+    _sleepCheckTick = 0
+    if _isStartingUp then return end
+
+    local ok, player = pcall(getPlayer)
+    if not ok or not player then return end
     if not isLocalPlayer(player) then return end
-    -- Guarda o pico antes de dormir
-    updateHoursWithoutSleep()
-    -- Marca o horário do último sono (para calcular horas awake depois)
-    local ok, md = pcall(function() return player:getModData() end)
-    if not ok or not md then return end
-    local hOk, hours = pcall(function() return player:getHoursSurvived() end)
-    if hOk and hours then
-        md["PZCommunityRank_LastSleepHours"] = hours
-    end
-    -- Rastreia locais únicos de sono (célula de 20x20 tiles)
-    pcall(function()
-        local xOk, x = pcall(function() return player:getX() end)
-        local yOk, y = pcall(function() return player:getY() end)
-        if not xOk or not yOk then return end
-        local cx = math.floor(x / 20)
-        local cy = math.floor(y / 20)
-        local sleepId = cx .. "_" .. cy
-        local tag = "|" .. sleepId .. "|"
-        if not _sleepLocCache[sleepId] then
-            _sleepLocCache[sleepId] = true
-            md["PZCommunityRank_SleepLocSet"] = (md["PZCommunityRank_SleepLocSet"] or "") .. tag
-            md["PZCommunityRank_SleepLocations"] = (tonumber(md["PZCommunityRank_SleepLocations"]) or 0) + 1
+
+    pcall(updateHoursWithoutSleep)
+
+    local asleepOk, asleep = pcall(function() return player:isAsleep() end)
+    if not asleepOk then return end
+    if asleep and not _wasAsleep then
+        -- Acabou de adormecer: guarda o pico antes de zerar a referencia.
+        pcall(updateHoursWithoutSleep)
+        local mdOk, md = pcall(function() return player:getModData() end)
+        if mdOk and md then
+            local hOk, hours = pcall(function() return player:getHoursSurvived() end)
+            if hOk and hours then
+                md["PZCommunityRank_LastSleepHours"] = hours
+            end
+            -- Rastreia locais únicos de sono (célula de 20x20 tiles)
+            pcall(function()
+                local xOk, x = pcall(function() return player:getX() end)
+                local yOk, y = pcall(function() return player:getY() end)
+                if not xOk or not yOk then return end
+                local cx = math.floor(x / 20)
+                local cy = math.floor(y / 20)
+                local sleepId = cx .. "_" .. cy
+                local tag = "|" .. sleepId .. "|"
+                if not _sleepLocCache[sleepId] then
+                    _sleepLocCache[sleepId] = true
+                    md["PZCommunityRank_SleepLocSet"] = (md["PZCommunityRank_SleepLocSet"] or "") .. tag
+                    md["PZCommunityRank_SleepLocations"] = (tonumber(md["PZCommunityRank_SleepLocations"]) or 0) + 1
+                end
+            end)
         end
-    end)
-end, "Inicio do sono")
+    end
+    _wasAsleep = asleep
+end)
 
 -- Restaurantes Spiffo visitados — detecta pelo tipo de room (spiffo_dining / spiffoskitchen)
 -- Usa set de building IDs no ModData para contar cada restaurante uma unica vez.
@@ -1744,4 +1792,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.25.4")
+RankLog.info("Mod carregado - B42.20 | v2.25.5")
