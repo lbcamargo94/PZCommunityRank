@@ -1270,49 +1270,44 @@ local function checkZoneVisit()
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
 
-    -- Tenta via getZoneList() — método pode não existir em todas as builds B42
-    if sq.getZoneList ~= nil then
+    -- Fix: sq:getZoneList() NAO EXISTE no B42 (confirmado contra o codigo do jogo —
+    -- so ha sq:getZone(), retornando UMA zona, nao uma lista). Esse bloco inteiro
+    -- nunca rodava (o "if sq.getZoneList ~= nil" sempre dava falso), zerando
+    -- CitiesVisited pra sempre e a metade "por zona" de MilitaryVisited (o fallback
+    -- por nome de comodo abaixo e independente e continua ativo).
     pcall(function()
-        local zl = sq:getZoneList()
-        if not zl then return end
-        local size = 0
-        pcall(function() size = zl:size() end)
-        for i = 0, size - 1 do
-            local zone = nil
-            pcall(function() zone = zl:get(i) end)
-            if not zone then break end
+        local zone = sq:getZone()
+        if not zone then return end
 
-            local zoneName, zoneType = "", ""
-            pcall(function() zoneName = tostring(zone:getName() or "") end)
-            pcall(function() zoneType = tostring(zone:getType() or "") end)
-            local nl = zoneName:lower()
-            local tl = zoneType:lower()
+        local zoneName, zoneType = "", ""
+        pcall(function() zoneName = tostring(zone:getName() or "") end)
+        pcall(function() zoneType = tostring(zone:getType() or "") end)
+        local nl = zoneName:lower()
+        local tl = zoneType:lower()
 
-            -- Cidades (zona de tipo Town/City ou nome de cidade conhecida)
-            if not _visitedCityZones[zoneName] then
-                if tl:find("town", 1, true) or tl:find("city", 1, true) or
-                   nl:find("muldraugh", 1, true) or nl:find("rosewood", 1, true) or
-                   nl:find("west point", 1, true) or nl:find("riverside", 1, true) or
-                   nl:find("louisville", 1, true) or nl:find("march ridge", 1, true) or
-                   nl:find("ekron", 1, true) or nl:find("doe valley", 1, true) then
-                    _visitedCityZones[zoneName] = true
-                    md["PZCommunityRank_CitiesVisited"] = (tonumber(md["PZCommunityRank_CitiesVisited"]) or 0) + 1
-                    RankLog.info("Cidade visitada: " .. zoneName)
-                end
+        -- Cidades (zona de tipo Town/City ou nome de cidade conhecida)
+        if not _visitedCityZones[zoneName] then
+            if tl:find("town", 1, true) or tl:find("city", 1, true) or
+               nl:find("muldraugh", 1, true) or nl:find("rosewood", 1, true) or
+               nl:find("west point", 1, true) or nl:find("riverside", 1, true) or
+               nl:find("louisville", 1, true) or nl:find("march ridge", 1, true) or
+               nl:find("ekron", 1, true) or nl:find("doe valley", 1, true) then
+                _visitedCityZones[zoneName] = true
+                md["PZCommunityRank_CitiesVisited"] = (tonumber(md["PZCommunityRank_CitiesVisited"]) or 0) + 1
+                RankLog.info("Cidade visitada: " .. zoneName)
             end
+        end
 
-            -- Base militar
-            if not _visitedMilZones[zoneName] then
-                if tl:find("mil", 1, true) or nl:find("mil", 1, true) or
-                   nl:find("fort", 1, true) or nl:find("base", 1, true) then
-                    _visitedMilZones[zoneName] = true
-                    md["PZCommunityRank_MilitaryVisited"] = (tonumber(md["PZCommunityRank_MilitaryVisited"]) or 0) + 1
-                    RankLog.info("Base militar visitada: " .. zoneName)
-                end
+        -- Base militar
+        if not _visitedMilZones[zoneName] then
+            if tl:find("mil", 1, true) or nl:find("mil", 1, true) or
+               nl:find("fort", 1, true) or nl:find("base", 1, true) then
+                _visitedMilZones[zoneName] = true
+                md["PZCommunityRank_MilitaryVisited"] = (tonumber(md["PZCommunityRank_MilitaryVisited"]) or 0) + 1
+                RankLog.info("Base militar visitada: " .. zoneName)
             end
         end
     end)
-    end -- sq.getZoneList ~= nil
 
     -- Fallback: verifica nome do room atual para bases militares
     pcall(function()
@@ -1689,4 +1684,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.25.1")
+RankLog.info("Mod carregado - B42.20 | v2.25.2")
