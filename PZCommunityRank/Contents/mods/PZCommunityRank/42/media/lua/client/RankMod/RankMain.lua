@@ -1262,6 +1262,13 @@ addOptionalEvent("OnTick", updateVehicleDistance)
 local _visitedCityZones = {}
 local _visitedMilZones  = {}
 
+-- DIAGNOSTICO TEMPORARIO (remover apos confirmar o nome real da zona/comodo da
+-- base militar): loga toda mudanca de zona/comodo visitado, com posicao, pra
+-- descobrir os identificadores reais em vez de adivinhar palavras-chave. So
+-- loga quando muda (nao a cada tick) pra nao inundar o log.
+local _diagLastZoneKey = nil
+local _diagLastRoomKey = nil
+
 local function checkZoneVisit()
     local ok, player = pcall(getPlayer)
     if not ok or not player then return end
@@ -1269,6 +1276,37 @@ local function checkZoneVisit()
     if not sqOk or not sq then return end
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
+
+    pcall(function()
+        local px, py, pz = 0, 0, 0
+        pcall(function() px = math.floor(player:getX()) end)
+        pcall(function() py = math.floor(player:getY()) end)
+        pcall(function() pz = math.floor(player:getZ()) end)
+
+        local dzName, dzType = "", ""
+        pcall(function()
+            local z = sq:getZone()
+            if z then
+                pcall(function() dzName = tostring(z:getName() or "") end)
+                pcall(function() dzType = tostring(z:getType() or "") end)
+            end
+        end)
+        local zoneKey = dzName .. "|" .. dzType
+        if zoneKey ~= _diagLastZoneKey then
+            _diagLastZoneKey = zoneKey
+            RankLog.info(string.format("[DIAG-ZONE] pos=(%d,%d,%d) zoneName='%s' zoneType='%s'", px, py, pz, dzName, dzType))
+        end
+
+        local droom = ""
+        pcall(function()
+            local r = sq:getRoom()
+            if r then pcall(function() droom = tostring(r:getName() or "") end) end
+        end)
+        if droom ~= _diagLastRoomKey then
+            _diagLastRoomKey = droom
+            RankLog.info(string.format("[DIAG-ROOM] pos=(%d,%d,%d) roomName='%s'", px, py, pz, droom))
+        end
+    end)
 
     -- Fix: sq:getZoneList() NAO EXISTE no B42 (confirmado contra o codigo do jogo —
     -- so ha sq:getZone(), retornando UMA zona, nao uma lista). Esse bloco inteiro
@@ -1684,4 +1722,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.25.2")
+RankLog.info("Mod carregado - B42.20 | v2.25.3")

@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.25.2 - Corrige deteccao de cidades visitadas (conquista Explorador) e base militar visitada. O codigo tentava usar sq:getZoneList(), metodo que nao existe no B42 - a API real e sq:getZone() (uma zona, nao lista). O bloco inteiro nunca executava, entao cidades visitadas nunca era contado. Trocado pra usar a API correta."
+	"changenote"		"v2.25.3 - Adiciona log de diagnostico temporario (sem impacto no jogo) para descobrir o nome real da zona/comodo da base militar - as palavras-chave atuais (armory/barracks/guardpost) nao foram confirmadas contra o jogo real. Sera usado para corrigir a deteccao de forma precisa numa proxima versao."
 }
