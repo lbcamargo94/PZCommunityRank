@@ -1286,67 +1286,80 @@ pcall(function()
     require "TimedActions/Animals/ISMilkAnimal"
     if ISMilkAnimal and ISMilkAnimal.milk and not ISMilkAnimal._pzRankPatched then
         local origMilk = ISMilkAnimal.milk
+        -- v2.27.0: conta LITROS (o que saiu do animal), nao chamadas. O jogo chama
+        -- milk() varias vezes numa mesma ordenha (a cada timePerLiter em update()) e
+        -- ate a v2.26.0 cada chamada somava 1 — valor inflado (44 mil em 8 runs).
+        -- Chave nova (MilkLiters) pra nao herdar o valor antigo.
         ISMilkAnimal.milk = function(self)
-            local before = 0
+            local before = nil
             pcall(function() if self.animal then before = self.animal:getData():getMilkQuantity() end end)
-            origMilk(self)
-            if self and self.character and isLocalPlayer(self.character) then
+            local result = origMilk(self)
+            if before ~= nil and self and self.character and isLocalPlayer(self.character) then
                 pcall(function()
                     if not self.animal then return end
-                    local after = self.animal:getData():getMilkQuantity()
-                    if after < before then
-                        incModCounter("PZCommunityRank_MilkProduced")
-                    end
+                    local liters = (tonumber(before) or 0) - (tonumber(self.animal:getData():getMilkQuantity()) or 0)
+                    if liters <= 0 then return end
+                    local md = self.character:getModData()
+                    local total = (tonumber(md["PZCommunityRank_MilkLitersF"]) or 0) + liters
+                    md["PZCommunityRank_MilkLitersF"] = total
+                    md["PZCommunityRank_MilkLiters"]  = math.floor(total)
                 end)
             end
+            return result
         end
         ISMilkAnimal._pzRankPatched = true
         _milkPatched = true
         RankLog.info("Leite produzido: patch instalado.")
     end
 end)
+-- (fallback por evento removido na v2.27.0: OnPlayerMilkAnimal/OnMilkAnimal/
+-- OnAnimalMilked nao existem no B42 — conferido contra LuaEventManager)
 if not _milkPatched then
-    addFirstAvailableEvent({ "OnPlayerMilkAnimal", "OnMilkAnimal", "OnAnimalMilked" }, function(player)
-        if player and isLocalPlayer(player) then incModCounter("PZCommunityRank_MilkProduced") end
-    end, "Leite produzido (evento)")
+    RankLog.warn("Leite produzido: ISMilkAnimal indisponivel nesta build - stat ficara zerado.")
 end
 
 -- (Categorizacao de receitas — ceramica, forja, refeicoes, materiais, roupas,
--- armas, queijo, estacoes — consolidada no patch de ISCraftAction acima.
+-- armas, queijo, estacoes — consolidada em countCraftRecipe(), mais acima.
 -- O handler antigo baseado em OnCraftRecipeCompleted/OnCraftResult foi removido
 -- daqui: esse evento nunca existiu no B42, entao nunca rodava.)
 
--- Quilômetros dirigidos (tracking de posicao do veiculo em OnTick)
-local _lastVehiclePos = nil
+-- Quilometros dirigidos (como MOTORISTA), pelo velocimetro do veiculo.
+-- v2.27.0: ate a v2.26.0 somava distancia em tiles (supondo 500 tiles = 1 km) e a
+-- cada ~10s fazia "total += floor(pendente); pendente = 0" — com pendente entre
+-- 0,5 e 1 o floor dava 0 e o trecho era DESCARTADO (a 50 km/h, 10s = ~0,14 km).
+-- Resultado real: 9 km somados em 5 runs. Agora integra getCurrentSpeedKmHour()
+-- pelo tempo real de cada tick e guarda a fracao no ModData (nada se perde).
 local _pendingKm = 0.0
 local _kmSaveTick = 0
-local KM_SAVE_INTERVAL = 600  -- salva no ModData a cada ~10s (60fps)
-local KM_TILES_PER_KM  = 500  -- ~1 tile = 2m; 500 tiles ≈ 1 km
+local KM_SAVE_INTERVAL = 600   -- grava no ModData a cada ~10s (60fps)
+local KM_MAX_SPEED     = 300   -- km/h — descarta leitura absurda (glitch de fisica)
 
 local function updateVehicleDistance()
     local ok, player = pcall(getPlayer)
-    if not ok or not player then _lastVehiclePos = nil; return end
+    if not ok or not player then return end
     local vehOk, vehicle = pcall(function() return player:getVehicle() end)
-    if not vehOk or not vehicle then _lastVehiclePos = nil; return end
-
-    local xOk, px = pcall(function() return vehicle:getX() end)
-    if not xOk or type(px) ~= "number" then return end
-    local yOk, py = pcall(function() return vehicle:getY() end)
-    if not yOk or type(py) ~= "number" then return end
-
-    if _lastVehiclePos then
-        local dx = px - _lastVehiclePos.x
-        local dy = py - _lastVehiclePos.y
-        _pendingKm = _pendingKm + math.sqrt(dx*dx + dy*dy) / KM_TILES_PER_KM
+    if vehOk and vehicle then
+        local drvOk, driver = pcall(function() return vehicle:getDriver() end)
+        if drvOk and driver == player then
+            local spOk, speed = pcall(function() return vehicle:getCurrentSpeedKmHour() end)
+            local dtOk, dt = pcall(function() return getGameTime():getRealworldSecondsSinceLastUpdate() end)
+            speed = spOk and math.abs(tonumber(speed) or 0) or 0
+            dt = dtOk and (tonumber(dt) or 0) or 0
+            -- dt > 1s = pausa/carregamento: ignora pra nao somar distancia fantasma
+            if speed > 0 and speed <= KM_MAX_SPEED and dt > 0 and dt <= 1 then
+                _pendingKm = _pendingKm + speed * dt / 3600
+            end
+        end
     end
-    _lastVehiclePos = { x = px, y = py }
 
     _kmSaveTick = _kmSaveTick + 1
-    if _kmSaveTick >= KM_SAVE_INTERVAL then
+    if _kmSaveTick >= KM_SAVE_INTERVAL and _pendingKm > 0 then
         _kmSaveTick = 0
         local mdOk, md = pcall(function() return player:getModData() end)
-        if mdOk and md and _pendingKm >= 0.5 then
-            md["PZCommunityRank_KmDriven"] = (tonumber(md["PZCommunityRank_KmDriven"]) or 0) + math.floor(_pendingKm)
+        if mdOk and md then
+            local total = (tonumber(md["PZCommunityRank_KmDrivenF"]) or tonumber(md["PZCommunityRank_KmDriven"]) or 0) + _pendingKm
+            md["PZCommunityRank_KmDrivenF"] = total
+            md["PZCommunityRank_KmDriven"]  = math.floor(total)
             _pendingKm = 0.0
         end
     end
@@ -1355,14 +1368,15 @@ addOptionalEvent("OnTick", updateVehicleDistance)
 
 -- Cidades e bases militares visitadas (verificacao periodica de zonas do tile atual)
 local _visitedCityZones = {}
-local _visitedMilZones  = {}
 
--- DIAGNOSTICO TEMPORARIO (remover apos confirmar o nome real da zona/comodo da
--- base militar): loga toda mudanca de zona/comodo visitado, com posicao, pra
--- descobrir os identificadores reais em vez de adivinhar palavras-chave. So
--- loga quando muda (nao a cada tick) pra nao inundar o log.
-local _diagLastZoneKey = nil
-local _diagLastRoomKey = nil
+-- Base Militar Secreta (objetivo "Operacao Base Militar", ao norte de Rosewood):
+-- area das zonas SecretBase (superficie) + SecretLab (subsolo, z -1 a -17) do mapa
+-- do B42 — media/maps/*/objects.lua: SecretBase x=5534 y=12437 138x92; SecretLab
+-- de x=5513 a 5593, y=12411 a 12514. v2.27.0: deteccao por POSICAO (dados do jogo).
+-- Antes era por palavra-chave ("mil"/"fort"/"base" no nome da zona ou comodo):
+-- sq:getZone() devolve UMA zona por tile (quase nunca a ZombiesType da base) e
+-- "base" casaria ate com "BaseballFan" — 0 em 100% das runs de producao.
+local MILITARY_BASE_AREA = { x1 = 5513, y1 = 12411, x2 = 5672, y2 = 12529 }
 
 local function checkZoneVisit()
     local ok, player = pcall(getPlayer)
@@ -1372,42 +1386,7 @@ local function checkZoneVisit()
     local mdOk, md = pcall(function() return player:getModData() end)
     if not mdOk or not md then return end
 
-    pcall(function()
-        local px, py, pz = 0, 0, 0
-        pcall(function() px = math.floor(player:getX()) end)
-        pcall(function() py = math.floor(player:getY()) end)
-        pcall(function() pz = math.floor(player:getZ()) end)
-
-        local dzName, dzType = "", ""
-        pcall(function()
-            local z = sq:getZone()
-            if z then
-                pcall(function() dzName = tostring(z:getName() or "") end)
-                pcall(function() dzType = tostring(z:getType() or "") end)
-            end
-        end)
-        local zoneKey = dzName .. "|" .. dzType
-        if zoneKey ~= _diagLastZoneKey then
-            _diagLastZoneKey = zoneKey
-            RankLog.info(string.format("[DIAG-ZONE] pos=(%d,%d,%d) zoneName='%s' zoneType='%s'", px, py, pz, dzName, dzType))
-        end
-
-        local droom = ""
-        pcall(function()
-            local r = sq:getRoom()
-            if r then pcall(function() droom = tostring(r:getName() or "") end) end
-        end)
-        if droom ~= _diagLastRoomKey then
-            _diagLastRoomKey = droom
-            RankLog.info(string.format("[DIAG-ROOM] pos=(%d,%d,%d) roomName='%s'", px, py, pz, droom))
-        end
-    end)
-
-    -- Fix: sq:getZoneList() NAO EXISTE no B42 (confirmado contra o codigo do jogo —
-    -- so ha sq:getZone(), retornando UMA zona, nao uma lista). Esse bloco inteiro
-    -- nunca rodava (o "if sq.getZoneList ~= nil" sempre dava falso), zerando
-    -- CitiesVisited pra sempre e a metade "por zona" de MilitaryVisited (o fallback
-    -- por nome de comodo abaixo e independente e continua ativo).
+    -- Cidades visitadas (zona do tile atual)
     pcall(function()
         local zone = sq:getZone()
         if not zone then return end
@@ -1431,32 +1410,16 @@ local function checkZoneVisit()
             end
         end
 
-        -- Base militar
-        if not _visitedMilZones[zoneName] then
-            if tl:find("mil", 1, true) or nl:find("mil", 1, true) or
-               nl:find("fort", 1, true) or nl:find("base", 1, true) then
-                _visitedMilZones[zoneName] = true
-                md["PZCommunityRank_MilitaryVisited"] = (tonumber(md["PZCommunityRank_MilitaryVisited"]) or 0) + 1
-                RankLog.info("Base militar visitada: " .. zoneName)
-            end
-        end
     end)
 
-    -- Fallback: verifica nome do room atual para bases militares
+    -- Base militar: basta pisar uma vez na area (qualquer andar)
     pcall(function()
-        local roomOk2, room = pcall(function() return sq:getRoom() end)
-        if not roomOk2 or not room then return end
-        local roomNameOk, rawName = pcall(function() return room:getName() end)
-        if not roomNameOk or not rawName then return end
-        local roomName = tostring(rawName):lower()
-        local roomKey = "room_" .. roomName
-        if not _visitedMilZones[roomKey] then
-            if roomName:find("armory", 1, true) or roomName:find("barracks", 1, true) or
-               roomName:find("guardpost", 1, true) or roomName:find("military", 1, true) then
-                _visitedMilZones[roomKey] = true
-                md["PZCommunityRank_MilitaryVisited"] = (tonumber(md["PZCommunityRank_MilitaryVisited"]) or 0) + 1
-                RankLog.info("Base militar visitada (room): " .. roomName)
-            end
+        if (tonumber(md["PZCommunityRank_MilitaryVisited"]) or 0) >= 1 then return end
+        local x, y = player:getX(), player:getY()
+        local a = MILITARY_BASE_AREA
+        if x >= a.x1 and x <= a.x2 and y >= a.y1 and y <= a.y2 then
+            md["PZCommunityRank_MilitaryVisited"] = 1
+            RankLog.info(string.format("Base militar visitada: pos=(%d,%d)", math.floor(x), math.floor(y)))
         end
     end)
 end
@@ -1550,11 +1513,42 @@ if not _waterPatched then
     RankLog.warn("Agua coletada: ISTakeWaterAction indisponivel nesta build - stat ficara zerado.")
 end
 
--- Rastros de animais rastreados
-addFirstAvailableEvent({ "OnPlayerTrackAnimal", "OnAnimalTrackFound", "OnTrackAnimal" }, function(player)
-    if not player or not isLocalPlayer(player) then return end
-    incModCounter("PZCommunityRank_AnimalTracks")
-end, "Rastros de animais")
+-- Rastros de animais seguidos (conquista "Rastreador: siga 50 rastros").
+-- v2.27.0: ate a v2.26.0 escutava OnPlayerTrackAnimal/OnAnimalTrackFound/OnTrackAnimal
+-- — nenhum existe no B42 (0 em 100% das runs). A acao real e examinar um rastro
+-- encontrado: ISInspectAnimalTrackAction (client/TimedActions/Animal), criada pelo
+-- menu de rastros (ISAnimalTracksMenu). Como fica em client/, pode ainda nao estar
+-- carregada quando este arquivo roda: tenta agora e de novo no OnGameStart.
+local _tracksPatched = false
+local function patchAnimalTracks()
+    if _tracksPatched then return end
+    pcall(function()
+        pcall(require, "TimedActions/Animal/ISInspectAnimalTrackAction")
+        if ISInspectAnimalTrackAction and ISInspectAnimalTrackAction.perform
+           and not ISInspectAnimalTrackAction._pzRankPatched then
+            local origInspect = ISInspectAnimalTrackAction.perform
+            ISInspectAnimalTrackAction.perform = function(self)
+                local result = origInspect(self)
+                if self and self.character and isLocalPlayer(self.character) then
+                    incModCounter("PZCommunityRank_AnimalTracks")
+                end
+                return result
+            end
+            ISInspectAnimalTrackAction._pzRankPatched = true
+            _tracksPatched = true
+            RankLog.info("Rastros de animais: patch instalado (ISInspectAnimalTrackAction).")
+        end
+    end)
+end
+patchAnimalTracks()
+if not _tracksPatched then
+    addOptionalEvent("OnGameStart", function()
+        patchAnimalTracks()
+        if not _tracksPatched then
+            RankLog.warn("Rastros de animais: ISInspectAnimalTrackAction indisponivel - stat ficara zerado.")
+        end
+    end)
+end
 
 if Events.OnTryTalkInChat then
     Events.OnTryTalkInChat.Add(onChatCommand)
@@ -1856,4 +1850,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.26.0")
+RankLog.info("Mod carregado - B42.20 | v2.27.0")

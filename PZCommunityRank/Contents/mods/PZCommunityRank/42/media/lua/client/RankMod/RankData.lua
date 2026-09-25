@@ -247,7 +247,7 @@ function RankData.collectExtended(player)
         result.spiffo_visited      = readInt("PZCommunityRank_SpiffoVisited")
         -- PZRX6
         result.eggs_collected      = readInt("PZCommunityRank_EggsCollected")
-        result.milk_produced       = readInt("PZCommunityRank_MilkProduced")
+        result.milk_produced       = readInt("PZCommunityRank_MilkLiters")  -- litros (v2.27.0)
         result.stone_structures    = readInt("PZCommunityRank_StoneStructures")
         result.ceramic_items       = readInt("PZCommunityRank_CeramicItems")
         result.forged_weapons      = readInt("PZCommunityRank_ForgedWeapons")
