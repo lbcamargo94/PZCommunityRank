@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.25.5 - Corrige 3 stats zeradas por eventos inexistentes/inalcancaveis: vegetais colhidos (evento OnPlantHarvested nao existe, agora usa ISHarvestPlantAction), locais de sono e horas sem dormir (evento OnPlayerStartSleeping nao existe - a funcao de calculo nunca era chamada mesmo apos fix anterior, agora usa polling de player:isAsleep()). Todas as 3 confirmadas em 0 em 997 personagens de producao antes da correcao."
+	"changenote"		"v2.26.0 - Corrige estatisticas que ficavam sempre zeradas: itens fabricados, refeicoes preparadas, materiais, armas, roupas, ceramica, forja, queijo e estacoes de trabalho (o mod escutava o sistema de crafting antigo; agora usa o da janela de crafting e bancadas do B42) e agua coletada (agora conta os litros realmente coletados em torneiras, pocos e coletores de chuva). A contagem comeca a partir desta atualizacao."
 }

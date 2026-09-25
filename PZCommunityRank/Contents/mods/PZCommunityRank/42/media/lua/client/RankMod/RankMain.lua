@@ -775,145 +775,170 @@ end
 
 -- Itens fabricados via receita (crafting) + categorizacao (ceramica, forja,
 -- refeicoes, materiais, roupas, armas, queijo, estacoes usadas).
--- Patch primario em ISCraftAction — a TimedAction real usada por TODAS as
--- receitas do sistema de crafting do B42. Substitui os handlers antigos de
--- OnCraftRecipeCompleted/OnCraftResult: esses eventos NAO EXISTEM no B42
--- (confirmado contra o codigo do jogo — Events[nome] e sempre nil, entao
--- addOptionalEvent falhava silenciosamente pra sempre). Resultado real: items_crafted,
--- weapons_crafted, clothes_crafted, ceramic_items, forged_weapons, meals_cooked,
--- materials_crafted, cheese_produced e stations_used ficavam zerados pra todo
--- mundo, sempre — nao so raro, nunca (confirmado: 0 em 997 entries de producao).
+--
+-- v2.26.0: o B42 tem DOIS caminhos de crafting e o mod so escutava o errado.
+--   - ISHandcraftAction (shared/Entity/TimedActions) — a janela de crafting e as
+--     bancadas do B42. E o caminho de praticamente TODA receita do jogo.
+--   - ISCraftAction (shared/TimedActions) — sistema antigo de receitas; no B42.20.4
+--     so e criado por ISInventoryPaneContextMenu (caminho legado).
+-- Ate a v2.25.5 so havia patch no ISCraftAction -> items_crafted, meals_cooked,
+-- weapons/clothes/materials/ceramic/forged, cheese e stations ficavam em 0 pra
+-- todo mundo (confirmado: 0 em 54 runs com stats pelo Companion, media 89 dias).
+-- Os eventos OnCraftRecipeCompleted/OnCraftResult do fallback antigo NAO existem
+-- no B42 (conferido contra LuaEventManager) — fallback removido.
+local function countCraftRecipe(recipe)
+    incModCounter("PZCommunityRank_ItemsCrafted")
+    pcall(function()
+        -- recipeKey = nome da receita + categoria + tags, em minusculas
+        local recipeKey = tostring(recipe:getName() or ""):lower()
+        -- Categoria do B42 (Cooking, Tailoring, Weaponry, Pottery, Blacksmithing...):
+        -- entra no recipeKey pra que as palavras-chave abaixo casem com ela tambem.
+        -- Nenhum Lua do jogo usa getCategory() -> pcall (existe em CraftRecipe.class).
+        local okCat, cat = pcall(function() return recipe:getCategory() end)
+        if okCat and cat then recipeKey = recipeKey .. " " .. tostring(cat):lower() end
+        local okTags, tags = pcall(function() return recipe:getTags() end)
+        if okTags and tags then
+            for i = 0, tags:size() - 1 do
+                local okTag, tag = pcall(function() return tostring(tags:get(i)) end)
+                if okTag and tag then recipeKey = recipeKey .. " " .. tag:lower() end
+            end
+        end
+
+        if recipeKey:find("ceramic", 1, true) or recipeKey:find("clay", 1, true) or
+           recipeKey:find("argila", 1, true) or recipeKey:find("cerami", 1, true) or
+           recipeKey:find("pottery", 1, true) or recipeKey:find("bowl", 1, true) or
+           recipeKey:find("jug", 1, true) then
+            incModCounter("PZCommunityRank_CeramicItems")
+        end
+
+        if recipeKey:find("forg", 1, true) or recipeKey:find("smelt", 1, true) or
+           recipeKey:find("anvil", 1, true) or recipeKey:find("forja", 1, true) or
+           recipeKey:find("smit", 1, true) or recipeKey:find("blacksmith", 1, true) then
+            incModCounter("PZCommunityRank_ForgedWeapons")
+        end
+
+        if recipeKey:find("cook", 1, true) or recipeKey:find("bake", 1, true) or
+                   recipeKey:find("cooking", 1, true) or
+           recipeKey:find("grill", 1, true) or recipeKey:find("cozi", 1, true) or
+           recipeKey:find("assar", 1, true) or recipeKey:find("stew", 1, true) or
+           recipeKey:find("soup", 1, true)  or recipeKey:find("fry", 1, true) or
+           recipeKey:find("roast", 1, true) or recipeKey:find("simmer", 1, true) then
+            incModCounter("PZCommunityRank_MealsCooked")
+        end
+
+        if recipeKey:find("plank", 1, true) or recipeKey:find("lumber", 1, true) or
+           recipeKey:find("board", 1, true) or recipeKey:find("taboa", 1, true) or
+           recipeKey:find("log ", 1, true) then
+            incModCounter("PZCommunityRank_MaterialsCrafted")
+        end
+
+        -- Roupas fabricadas: sem acesso ao item resultante em perform() (so
+        -- existe dentro de complete(), nao fica em self) — usa so palavras-chave.
+        if recipeKey:find("sew", 1, true) or recipeKey:find("tailor", 1, true) or
+           recipeKey:find("costur", 1, true) or recipeKey:find("clothing", 1, true) or
+           recipeKey:find("shirt", 1, true) or recipeKey:find("pants", 1, true) or
+           recipeKey:find("jacket", 1, true) or recipeKey:find("vest", 1, true) or
+           recipeKey:find("camiseta", 1, true) or recipeKey:find("calca", 1, true) or
+           recipeKey:find("jaqueta", 1, true) or recipeKey:find("blusa", 1, true) then
+            incModCounter("PZCommunityRank_ClothesCrafted")
+        end
+
+        if recipeKey:find("cheese", 1, true) or recipeKey:find("queijo", 1, true) then
+            incModCounter("PZCommunityRank_CheeseProduced")
+        end
+
+        if recipeKey:find("spear", 1, true) or recipeKey:find("lanca", 1, true) or
+           recipeKey:find("lance", 1, true) or recipeKey:find("knife", 1, true) or
+           recipeKey:find("faca",  1, true) or recipeKey:find("blade", 1, true) or
+           recipeKey:find("sword", 1, true) or recipeKey:find("espada",1, true) or
+           recipeKey:find("arrow", 1, true) or recipeKey:find("flecha",1, true) or
+           recipeKey:find("bow",   1, true) or recipeKey:find("arco",  1, true) or
+           recipeKey:find("club",  1, true) or recipeKey:find("clava", 1, true) or
+           recipeKey:find("pike",  1, true) or recipeKey:find("shiv",  1, true) or
+           recipeKey:find("shank", 1, true) or recipeKey:find("mace",  1, true) or
+           recipeKey:find("weapon", 1, true) or recipeKey:find("weaponry", 1, true) then
+            incModCounter("PZCommunityRank_WeaponsCrafted")
+        end
+
+        -- Estacoes de craft usadas: track categorias unicas (_stationsCache
+        -- e upvalue do arquivo, ja carregado do ModData — nao redeclarar aqui)
+        local ok2, player2 = pcall(getPlayer)
+        if ok2 and player2 then
+            local mdOk, md = pcall(function() return player2:getModData() end)
+            if mdOk and md then
+                local changed = false
+                local function addSt(tag)
+                    if _stationsCache[tag] then return end
+                    _stationsCache[tag] = true
+                    md["PZCommunityRank_StationsSet"] = (md["PZCommunityRank_StationsSet"] or "") .. "|" .. tag .. "|"
+                    changed = true
+                end
+                if recipeKey:find("wood", 1, true) or recipeKey:find("carpent", 1, true) or
+                   recipeKey:find("madei", 1, true) or recipeKey:find("marcen", 1, true) then addSt("woodwork") end
+                if recipeKey:find("weld", 1, true) or recipeKey:find("metalwork", 1, true) or
+                   recipeKey:find("sold", 1, true) or recipeKey:find("metal ", 1, true) then addSt("metalwork") end
+                if recipeKey:find("forg", 1, true) or recipeKey:find("anvil", 1, true) or
+                   recipeKey:find("blacksmith", 1, true) or recipeKey:find("ferr", 1, true) then addSt("blacksmith") end
+                if recipeKey:find("mason", 1, true) or recipeKey:find("alvenar", 1, true) or
+                   recipeKey:find("mortar", 1, true) or recipeKey:find("brick", 1, true) then addSt("masonry") end
+                if recipeKey:find("potter", 1, true) or recipeKey:find("ceramic", 1, true) or
+                   recipeKey:find("clay", 1, true) or recipeKey:find("argila", 1, true) then addSt("pottery") end
+                if recipeKey:find("glass", 1, true) or recipeKey:find("vidro", 1, true) or
+                   recipeKey:find("kiln", 1, true) then addSt("glassmaking") end
+                if recipeKey:find("sew", 1, true) or recipeKey:find("tailor", 1, true) or
+                   recipeKey:find("costur", 1, true) or recipeKey:find("clothing", 1, true) then addSt("tailoring") end
+                if recipeKey:find("cook", 1, true) or recipeKey:find("bake", 1, true) or
+                   recipeKey:find("grill", 1, true) or recipeKey:find("cozi", 1, true) then addSt("cooking") end
+                if changed then
+                    local cnt = 0
+                    for _ in pairs(_stationsCache) do cnt = cnt + 1 end
+                    md["PZCommunityRank_StationsUsed"] = cnt
+                end
+            end
+        end
+    end)
+end
+
 local _craftPatched = false
+-- Caminho principal do B42: janela de crafting / bancadas
 pcall(function()
-    require "TimedActions/ISCraftAction"
+    -- shared/ ja e carregado pelo jogo; require isolado: se o caminho falhar, nao
+    -- pode abortar o patch (a classe global normalmente ja existe)
+    pcall(require, "Entity/TimedActions/ISHandcraftAction")
+    if ISHandcraftAction and ISHandcraftAction.perform and not ISHandcraftAction._pzRankPatched then
+        local origHandcraft = ISHandcraftAction.perform
+        ISHandcraftAction.perform = function(self)
+            local result = origHandcraft(self)
+            -- perform() roda uma vez por item fabricado (multicraft chama de novo)
+            if self and self.character and isLocalPlayer(self.character) and self.craftRecipe then
+                countCraftRecipe(self.craftRecipe)
+            end
+            return result
+        end
+        ISHandcraftAction._pzRankPatched = true
+        _craftPatched = true
+        RankLog.info("Itens fabricados: patch instalado (ISHandcraftAction).")
+    end
+end)
+-- Caminho legado (receitas antigas pelo menu de contexto do inventario)
+pcall(function()
+    pcall(require, "TimedActions/ISCraftAction")
     if ISCraftAction and ISCraftAction.perform and not ISCraftAction._pzRankPatched then
         local origCraft = ISCraftAction.perform
         ISCraftAction.perform = function(self)
             local result = origCraft(self)
             if self and self.character and isLocalPlayer(self.character) and self.recipe then
-                incModCounter("PZCommunityRank_ItemsCrafted")
-                pcall(function()
-                    -- recipeKey = nome da receita + tags (B42 usa Recipe:getTags(),
-                    -- nao existe Recipe:getCategory() — ver ISCraftRecipeInfoBox.lua)
-                    local recipeKey = tostring(self.recipe:getName() or ""):lower()
-                    local okTags, tags = pcall(function() return self.recipe:getTags() end)
-                    if okTags and tags then
-                        for i = 0, tags:size() - 1 do
-                            local okTag, tag = pcall(function() return tostring(tags:get(i)) end)
-                            if okTag and tag then recipeKey = recipeKey .. " " .. tag:lower() end
-                        end
-                    end
-
-                    if recipeKey:find("ceramic", 1, true) or recipeKey:find("clay", 1, true) or
-                       recipeKey:find("argila", 1, true) or recipeKey:find("cerami", 1, true) or
-                       recipeKey:find("pottery", 1, true) or recipeKey:find("bowl", 1, true) or
-                       recipeKey:find("jug", 1, true) then
-                        incModCounter("PZCommunityRank_CeramicItems")
-                    end
-
-                    if recipeKey:find("forg", 1, true) or recipeKey:find("smelt", 1, true) or
-                       recipeKey:find("anvil", 1, true) or recipeKey:find("forja", 1, true) or
-                       recipeKey:find("smit", 1, true) or recipeKey:find("blacksmith", 1, true) then
-                        incModCounter("PZCommunityRank_ForgedWeapons")
-                    end
-
-                    if recipeKey:find("cook", 1, true) or recipeKey:find("bake", 1, true) or
-                       recipeKey:find("grill", 1, true) or recipeKey:find("cozi", 1, true) or
-                       recipeKey:find("assar", 1, true) or recipeKey:find("stew", 1, true) or
-                       recipeKey:find("soup", 1, true)  or recipeKey:find("fry", 1, true) or
-                       recipeKey:find("roast", 1, true) or recipeKey:find("simmer", 1, true) then
-                        incModCounter("PZCommunityRank_MealsCooked")
-                    end
-
-                    if recipeKey:find("plank", 1, true) or recipeKey:find("lumber", 1, true) or
-                       recipeKey:find("board", 1, true) or recipeKey:find("taboa", 1, true) or
-                       recipeKey:find("log ", 1, true) then
-                        incModCounter("PZCommunityRank_MaterialsCrafted")
-                    end
-
-                    -- Roupas fabricadas: sem acesso ao item resultante em perform() (so
-                    -- existe dentro de complete(), nao fica em self) — usa so palavras-chave.
-                    if recipeKey:find("sew", 1, true) or recipeKey:find("tailor", 1, true) or
-                       recipeKey:find("costur", 1, true) or recipeKey:find("clothing", 1, true) or
-                       recipeKey:find("shirt", 1, true) or recipeKey:find("pants", 1, true) or
-                       recipeKey:find("jacket", 1, true) or recipeKey:find("vest", 1, true) or
-                       recipeKey:find("camiseta", 1, true) or recipeKey:find("calca", 1, true) or
-                       recipeKey:find("jaqueta", 1, true) or recipeKey:find("blusa", 1, true) then
-                        incModCounter("PZCommunityRank_ClothesCrafted")
-                    end
-
-                    if recipeKey:find("cheese", 1, true) or recipeKey:find("queijo", 1, true) then
-                        incModCounter("PZCommunityRank_CheeseProduced")
-                    end
-
-                    if recipeKey:find("spear", 1, true) or recipeKey:find("lanca", 1, true) or
-                       recipeKey:find("lance", 1, true) or recipeKey:find("knife", 1, true) or
-                       recipeKey:find("faca",  1, true) or recipeKey:find("blade", 1, true) or
-                       recipeKey:find("sword", 1, true) or recipeKey:find("espada",1, true) or
-                       recipeKey:find("arrow", 1, true) or recipeKey:find("flecha",1, true) or
-                       recipeKey:find("bow",   1, true) or recipeKey:find("arco",  1, true) or
-                       recipeKey:find("club",  1, true) or recipeKey:find("clava", 1, true) or
-                       recipeKey:find("pike",  1, true) or recipeKey:find("shiv",  1, true) or
-                       recipeKey:find("shank", 1, true) or recipeKey:find("mace",  1, true) or
-                       recipeKey:find("weapon", 1, true) then
-                        incModCounter("PZCommunityRank_WeaponsCrafted")
-                    end
-
-                    -- Estacoes de craft usadas: track categorias unicas (_stationsCache
-                    -- e upvalue do arquivo, ja carregado do ModData — nao redeclarar aqui)
-                    local ok2, player2 = pcall(getPlayer)
-                    if ok2 and player2 then
-                        local mdOk, md = pcall(function() return player2:getModData() end)
-                        if mdOk and md then
-                            local changed = false
-                            local function addSt(tag)
-                                if _stationsCache[tag] then return end
-                                _stationsCache[tag] = true
-                                md["PZCommunityRank_StationsSet"] = (md["PZCommunityRank_StationsSet"] or "") .. "|" .. tag .. "|"
-                                changed = true
-                            end
-                            if recipeKey:find("wood", 1, true) or recipeKey:find("carpent", 1, true) or
-                               recipeKey:find("madei", 1, true) or recipeKey:find("marcen", 1, true) then addSt("woodwork") end
-                            if recipeKey:find("weld", 1, true) or recipeKey:find("metalwork", 1, true) or
-                               recipeKey:find("sold", 1, true) or recipeKey:find("metal ", 1, true) then addSt("metalwork") end
-                            if recipeKey:find("forg", 1, true) or recipeKey:find("anvil", 1, true) or
-                               recipeKey:find("blacksmith", 1, true) or recipeKey:find("ferr", 1, true) then addSt("blacksmith") end
-                            if recipeKey:find("mason", 1, true) or recipeKey:find("alvenar", 1, true) or
-                               recipeKey:find("mortar", 1, true) or recipeKey:find("brick", 1, true) then addSt("masonry") end
-                            if recipeKey:find("potter", 1, true) or recipeKey:find("ceramic", 1, true) or
-                               recipeKey:find("clay", 1, true) or recipeKey:find("argila", 1, true) then addSt("pottery") end
-                            if recipeKey:find("glass", 1, true) or recipeKey:find("vidro", 1, true) or
-                               recipeKey:find("kiln", 1, true) then addSt("glassmaking") end
-                            if recipeKey:find("sew", 1, true) or recipeKey:find("tailor", 1, true) or
-                               recipeKey:find("costur", 1, true) or recipeKey:find("clothing", 1, true) then addSt("tailoring") end
-                            if recipeKey:find("cook", 1, true) or recipeKey:find("bake", 1, true) or
-                               recipeKey:find("grill", 1, true) or recipeKey:find("cozi", 1, true) then addSt("cooking") end
-                            if changed then
-                                local cnt = 0
-                                for _ in pairs(_stationsCache) do cnt = cnt + 1 end
-                                md["PZCommunityRank_StationsUsed"] = cnt
-                            end
-                        end
-                    end
-                end)
+                countCraftRecipe(self.recipe)
             end
             return result
         end
         ISCraftAction._pzRankPatched = true
         _craftPatched = true
-        RankLog.info("Itens fabricados: patch instalado.")
+        RankLog.info("Itens fabricados: patch instalado (ISCraftAction, legado).")
     end
 end)
 if not _craftPatched then
-    addFirstAvailableEvent({ "OnCraftRecipeCompleted", "OnCraftResult" }, function(first, second, third)
-        local candidates = { first, second, third }
-        for _, candidate in ipairs(candidates) do
-            if candidate and isLocalPlayer(candidate) then
-                incModCounter("PZCommunityRank_ItemsCrafted")
-                return
-            end
-        end
-    end, "Itens fabricados (evento, fallback)")
+    RankLog.warn("Itens fabricados: ISHandcraftAction/ISCraftAction indisponiveis nesta build - stats de crafting ficarao zerados.")
 end
 
 -- Casas saqueadas: conta prédios únicos onde o jogador retirou um item de um
@@ -1479,12 +1504,51 @@ addOptionalEvent("OnTick", function()
     end
 end)
 
--- Água coletada (torneiras, pocos, chuva)
-addFirstAvailableEvent({ "OnPlayerFillContainer", "OnFillLiquidContainer", "OnFillContainer" }, function(first, second)
-    local player = second or first
-    if not player or not isLocalPlayer(player) then return end
-    incModCounter("PZCommunityRank_WaterCollected")
-end, "Agua coletada")
+-- Água coletada (torneiras, pocos, coletores de chuva), em LITROS.
+-- v2.26.0: ate a v2.25.5 isto escutava OnPlayerFillContainer/OnFillLiquidContainer
+-- (nao existem no B42) e caia em OnFillContainer — que EXISTE, mas e o evento de
+-- GERACAO DE LOOT em containers (server/Items/LootLog.lua), com (sala, tipo,
+-- container) e nunca o jogador -> contador sempre 0.
+-- Fix: patch em ISTakeWaterAction:transferFluid(amount) — por onde a agua sai da
+-- fonte. Com self.item = enchendo um recipiente (conta); sem item = bebendo direto
+-- da fonte (nao conta). Mede o que ENTROU de fato no recipiente (antes/depois) —
+-- o valor pedido pode ser maior que o transferido quando a fonte esta acabando, e
+-- a proxima atualizacao pede a diferenca de novo (somar o pedido contaria a mais).
+-- Acumula fracao de litro e grava o total inteiro.
+local _waterPatched = false
+pcall(function()
+    pcall(require, "TimedActions/ISTakeWaterAction")
+    if ISTakeWaterAction and ISTakeWaterAction.transferFluid and not ISTakeWaterAction._pzRankPatched then
+        local origTransfer = ISTakeWaterAction.transferFluid
+        ISTakeWaterAction.transferFluid = function(self, amount)
+            local fc, before = nil, nil
+            pcall(function()
+                if self and self.item and self.character and isLocalPlayer(self.character) then
+                    fc = self.item:getFluidContainer()
+                    if fc then before = fc:getAmount() end
+                end
+            end)
+            local result = origTransfer(self, amount)
+            pcall(function()
+                if not fc or before == nil then return end
+                local liters = (tonumber(fc:getAmount()) or 0) - (tonumber(before) or 0)
+                if liters <= 0 then return end
+                local mdOk, md = pcall(function() return self.character:getModData() end)
+                if not mdOk or not md then return end
+                local total = (tonumber(md["PZCommunityRank_WaterCollectedL"]) or 0) + liters
+                md["PZCommunityRank_WaterCollectedL"] = total
+                md["PZCommunityRank_WaterCollected"] = math.floor(total)
+            end)
+            return result
+        end
+        ISTakeWaterAction._pzRankPatched = true
+        _waterPatched = true
+        RankLog.info("Agua coletada: patch instalado (ISTakeWaterAction).")
+    end
+end)
+if not _waterPatched then
+    RankLog.warn("Agua coletada: ISTakeWaterAction indisponivel nesta build - stat ficara zerado.")
+end
 
 -- Rastros de animais rastreados
 addFirstAvailableEvent({ "OnPlayerTrackAnimal", "OnAnimalTrackFound", "OnTrackAnimal" }, function(player)
@@ -1792,4 +1856,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.25.5")
+RankLog.info("Mod carregado - B42.20 | v2.26.0")
