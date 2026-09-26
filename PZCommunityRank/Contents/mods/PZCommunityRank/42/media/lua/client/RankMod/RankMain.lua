@@ -1752,10 +1752,12 @@ end
 
 pcall(function()
     Events.OnHitZombie.Add(function(zombie, wielder, bodyPart, weapon)
-        if not zombie or not wielder or not isLocalPlayer(wielder) then return end
-        if _lastHitCount > 500 then _lastHit = {}; _lastHitCount = 0 end
-        if not _lastHit[zombie] then _lastHitCount = _lastHitCount + 1 end
-        _lastHit[zombie] = weaponInfo(weapon)
+        pcall(function()
+            if not zombie or not wielder or not isLocalPlayer(wielder) then return end
+            if _lastHitCount > 500 then _lastHit = {}; _lastHitCount = 0 end
+            if not _lastHit[zombie] then _lastHitCount = _lastHitCount + 1 end
+            _lastHit[zombie] = weaponInfo(weapon)
+        end)
     end)
 end)
 
