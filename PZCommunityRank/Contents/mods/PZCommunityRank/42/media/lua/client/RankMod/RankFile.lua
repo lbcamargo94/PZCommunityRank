@@ -206,8 +206,19 @@ function RankFile.saveManifest(entry)
     end
 end
 
--- Exporta delta de heatmap para pz_rank_heatmap_<charname>.log.
+-- Exporta um LOTE do mapa de calor para pz_rank_heatmap_<charname>.log.
 -- Lido pelo Companion e enviado como heatmap_delta no POST de sync.
+--
+-- v2.28.0: ate a v2.27.0 o arquivo levava as contagens ACUMULADAS de abates por
+-- celula e o servidor somava tudo de novo a cada sync (o mapa ficava centenas de
+-- vezes inflado). Agora cada arquivo e um lote:
+--   1o item {"type":"batch","id":"<nonce>-<seq>"} - o servidor ignora um id repetido
+--      (o Companion rele e reenvia o mesmo arquivo ao reiniciar);
+--   abates: so o que aumentou desde o lote anterior (HeatSent_<gx>_<gy>);
+--   base: so quando muda de celula;
+--   morte: vai em todo lote depois da morte - o servidor so conta no sync da morte.
+local HEAT_MAX_POINTS = 200
+
 function RankFile.saveHeatmap(player, charName)
     if not player or not charName then return end
     local safeName = sanitizeName(charName)
@@ -215,22 +226,46 @@ function RankFile.saveHeatmap(player, charName)
     local mdOk = pcall(function() md = player:getModData() end)
     if not mdOk or not md then return end
 
-    local parts = {}
-
-    -- Coleta kills por célula a partir do índice PZCommunityRank_HeatKillCells
     local cellsStr = md["PZCommunityRank_HeatKillCells"] or ""
+
+    -- Primeira vez na v2.28.0: o que ja foi acumulado antes conta como enviado
+    -- (o servidor zerou o mapa inflado; nao reenvia o historico de uma vez).
+    if not md["PZCommunityRank_HeatBatchInit"] then
+        for cell in cellsStr:gmatch("|([^|]+)|") do
+            md["PZCommunityRank_HeatSent_" .. cell] = tonumber(md["PZCommunityRank_HeatKill_" .. cell]) or 0
+        end
+        md["PZCommunityRank_HeatBatchInit"] = true
+    end
+
+    local parts   = {}
+    local pending = {}   -- atualizacoes de "ja enviado", aplicadas so se o arquivo for gravado
+
     for cell in cellsStr:gmatch("|([^|]+)|") do
+        if #parts >= HEAT_MAX_POINTS then break end  -- o resto vai no proximo lote
         local gxStr, gyStr = cell:match("^(-?%d+)_(-?%d+)$")
         if gxStr and gyStr then
-            local count = tonumber(md["PZCommunityRank_HeatKill_" .. gxStr .. "_" .. gyStr]) or 0
-            if count > 0 then
+            local count = tonumber(md["PZCommunityRank_HeatKill_" .. cell]) or 0
+            local sent  = tonumber(md["PZCommunityRank_HeatSent_" .. cell]) or 0
+            if count > sent then
                 parts[#parts + 1] = string.format(
-                    '{"type":"kill","gx":%s,"gy":%s,"count":%d}', gxStr, gyStr, count)
+                    '{"type":"kill","gx":%s,"gy":%s,"count":%d}', gxStr, gyStr, count - sent)
+                pending["PZCommunityRank_HeatSent_" .. cell] = count
             end
         end
     end
 
-    -- Posição de morte (se registrada)
+    -- Base: so quando mudou de celula desde o ultimo lote
+    local bGX = tonumber(md["PZCommunityRank_HeatBaseGX"])
+    local bGY = tonumber(md["PZCommunityRank_HeatBaseGY"])
+    if bGX and bGY and (bGX ~= tonumber(md["PZCommunityRank_HeatBaseSentGX"])
+                     or bGY ~= tonumber(md["PZCommunityRank_HeatBaseSentGY"])) then
+        parts[#parts + 1] = string.format(
+            '{"type":"base","gx":%d,"gy":%d,"count":1}', bGX, bGY)
+        pending["PZCommunityRank_HeatBaseSentGX"] = bGX
+        pending["PZCommunityRank_HeatBaseSentGY"] = bGY
+    end
+
+    -- Posicao de morte (se registrada)
     local dGX = tonumber(md["PZCommunityRank_HeatDeathGX"])
     local dGY = tonumber(md["PZCommunityRank_HeatDeathGY"])
     if dGX and dGY then
@@ -238,17 +273,16 @@ function RankFile.saveHeatmap(player, charName)
             '{"type":"death","gx":%d,"gy":%d,"count":1}', dGX, dGY)
     end
 
-    -- Posição de base (se registrada)
-    local bGX = tonumber(md["PZCommunityRank_HeatBaseGX"])
-    local bGY = tonumber(md["PZCommunityRank_HeatBaseGY"])
-    if bGX and bGY then
-        parts[#parts + 1] = string.format(
-            '{"type":"base","gx":%d,"gy":%d,"count":1}', bGX, bGY)
-    end
-
+    -- Nada novo: mantem o arquivo anterior (o servidor ignora o lote repetido)
     if #parts == 0 then return end
 
-    local json     = "[" .. table.concat(parts, ",") .. "]"
+    if not md["PZCommunityRank_HeatNonce"] then
+        md["PZCommunityRank_HeatNonce"] = tostring(ZombRand(1000000000))
+    end
+    local seq = (tonumber(md["PZCommunityRank_HeatBatchSeq"]) or 0) + 1
+    local batchId = md["PZCommunityRank_HeatNonce"] .. "-" .. seq
+
+    local json     = '[{"type":"batch","id":"' .. batchId .. '"},' .. table.concat(parts, ",") .. "]"
     -- B42.20 bloqueia .json no getFileWriter; o conteudo permanece JSON.
     local filePath = "pz_rank/pz_rank_heatmap_" .. safeName .. ".log"
 
@@ -262,7 +296,9 @@ function RankFile.saveHeatmap(player, charName)
     end)
 
     if ok2 and written then
-        RankLog.info("Heatmap salvo: " .. filePath .. " (" .. #parts .. " pontos)")
+        md["PZCommunityRank_HeatBatchSeq"] = seq
+        for k, v in pairs(pending) do md[k] = v end
+        RankLog.info("Heatmap salvo: " .. filePath .. " (lote " .. batchId .. ", " .. #parts .. " pontos)")
     elseif not ok2 then
         RankLog.error("Falha ao salvar heatmap " .. filePath .. ": " .. tostring(err2))
     else

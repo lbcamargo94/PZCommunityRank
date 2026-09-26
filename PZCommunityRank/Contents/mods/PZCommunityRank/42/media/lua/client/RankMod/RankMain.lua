@@ -221,8 +221,9 @@ local function triggerRank(player, playerIndex, isDead, deathCause)
         return
     end
 
-    RankFile.save(entry, code)
+    -- Heatmap ANTES do rank: o Companion le o heatmap quando o arquivo de rank muda
     pcall(function() RankFile.saveHeatmap(player, entry.character_name) end)
+    RankFile.save(entry, code)
     pcall(function() RankFile.saveStats(entry) end)
     pcall(function() RankFile.saveManifest(entry) end)
     -- Exporta sandbox em arquivo separado - independente do PZRX2
@@ -275,8 +276,9 @@ local function silentUpdate(player, playerIndex)
     end
     _lastSilentCode = code
 
-    RankFile.save(entry, code)
+    -- Heatmap ANTES do rank: o Companion le o heatmap quando o arquivo de rank muda
     pcall(function() RankFile.saveHeatmap(player, entry.character_name) end)
+    RankFile.save(entry, code)
     pcall(function() RankFile.saveStats(entry) end)
     pcall(function() RankFile.saveManifest(entry) end)
     pcall(function() RankSandboxExport.export(entry.character_name) end)
@@ -1850,4 +1852,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.27.0")
+RankLog.info("Mod carregado - B42.20 | v2.28.0")

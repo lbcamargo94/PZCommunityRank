@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.27.0 - Corrige mais 4 estatisticas: leite produzido (agora em litros; antes contava cada etapa da ordenha e ficava inflado), quilometros dirigidos (a distancia era descartada no calculo; agora usa o velocimetro e conta so quando voce dirige), rastros de animais seguidos (nunca contavam; agora conta cada rastro examinado) e base militar visitada (nunca detectava; agora usa a area real da Base Militar Secreta no mapa). A contagem dessas quatro recomeca a partir desta atualizacao."
+	"changenote"		"v2.28.0 - Corrige o mapa de calor do site (pagina /mapa): o mod mandava o total de abates de cada regiao em toda sincronizacao e o site somava de novo, deixando o mapa centenas de vezes inflado. Agora cada envio leva so o que aconteceu desde o anterior, e o local da morte conta uma unica vez. O mapa do site foi zerado e recomeca com os dados corretos a partir desta versao."
 }
