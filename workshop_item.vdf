@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.28.0 - Corrige o mapa de calor do site (pagina /mapa): o mod mandava o total de abates de cada regiao em toda sincronizacao e o site somava de novo, deixando o mapa centenas de vezes inflado. Agora cada envio leva so o que aconteceu desde o anterior, e o local da morte conta uma unica vez. O mapa do site foi zerado e recomeca com os dados corretos a partir desta versao."
+	"changenote"		"v2.29.0 - Registra com qual arma voce mata cada zumbi (a arma do golpe final leva o abate). O site passa a mostrar sua arma preferida no perfil e as armas que mais matam zumbis no campeonato (pagina /estatisticas). A contagem comeca a partir desta atualizacao."
 }

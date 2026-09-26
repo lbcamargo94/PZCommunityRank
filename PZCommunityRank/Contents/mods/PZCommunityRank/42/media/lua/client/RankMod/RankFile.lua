@@ -91,6 +91,9 @@ end
 -- Lido pelo Companion localmente — NAO e enviado ao backend.
 -- Conteudo JSON com os 33 campos de conquistas (PZRX3-8).
 -- .log porque B42.20 bloqueia .json no getFileWriter.
+RankFile.WEAPON_KILL_CATS = { "axe", "spear", "longblade", "smallblade", "blunt", "smallblunt",
+                              "firearm", "unarmed", "improvised", "other" }
+
 function RankFile.saveStats(entry)
     local safeName = sanitizeName(entry.character_name or "Sobrevivente")
     local ext      = entry.extended or {}
@@ -145,6 +148,30 @@ function RankFile.saveStats(entry)
         ext.animal_species      or 0,
         ext.days_no_canned      or 0
     )
+
+    -- v2.29.0: abates por arma (chaves numericas simples, assinadas pelo Companion
+    -- junto com o resto): wk_<tipo> = abates por tipo; wt:<item> = as 5 armas que
+    -- mais mataram. Ultimo golpe define a arma (RankMain.recordWeaponKill).
+    local wpart = {}
+    pcall(function()
+        local md = getPlayer():getModData()
+        for _, cat in ipairs(RankFile.WEAPON_KILL_CATS) do
+            local n = tonumber(md["PZCommunityRank_WK_" .. cat]) or 0
+            if n > 0 then wpart[#wpart + 1] = string.format('"wk_%s":%d', cat, n) end
+        end
+        local top = {}
+        for ft in (md["PZCommunityRank_WTSet"] or ""):gmatch("|([^|]+)|") do
+            local n = tonumber(md["PZCommunityRank_WT_" .. ft]) or 0
+            if n > 0 and ft:match("^[%w_%.]+$") then top[#top + 1] = { ft, n } end
+        end
+        table.sort(top, function(a, b) return a[2] > b[2] end)
+        for i = 1, math.min(5, #top) do
+            wpart[#wpart + 1] = string.format('"wt:%s":%d', top[i][1], top[i][2])
+        end
+    end)
+    if #wpart > 0 then
+        json = json:sub(1, -3) .. "," .. table.concat(wpart, ",") .. "}}"
+    end
 
     local ok, err = pcall(function()
         local w = getFileWriter(filePath, true, false)

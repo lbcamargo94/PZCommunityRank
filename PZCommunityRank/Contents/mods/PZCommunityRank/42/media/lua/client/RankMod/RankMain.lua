@@ -1723,11 +1723,73 @@ if not _animalSpeciesPatched then
     end, "Especies de animais (evento)")
 end
 
+-- -- Abates por arma (v2.29.0) -------------------------------------------
+-- OnHitZombie guarda a arma do ULTIMO golpe do jogador em cada zumbi; no
+-- OnZombieDead o abate vai para essa arma. Sem golpe registrado mas morto pelo
+-- jogador (atropelado, fogo, empurrao) = "other". Tipos = WeaponCategory do B42.
+local WEAPON_CATS = {
+    { "AXE", "axe" }, { "SPEAR", "spear" }, { "LONG_BLADE", "longblade" },
+    { "SMALL_BLADE", "smallblade" }, { "BLUNT", "blunt" }, { "SMALL_BLUNT", "smallblunt" },
+    { "UNARMED", "unarmed" }, { "IMPROVISED", "improvised" },  -- improvisada por ultimo
+}
+local _lastHit      = {}
+local _lastHitCount = 0
+
+local function weaponInfo(weapon)
+    if not weapon then return { ft = "Base.BareHands", cat = "unarmed" } end
+    local ft, cat
+    pcall(function() ft = weapon:getFullType() end)
+    pcall(function()
+        if weapon:isRanged() then cat = "firearm"; return end
+        local si = weapon:getScriptItem()
+        for _, c in ipairs(WEAPON_CATS) do
+            local wc = WeaponCategory[c[1]]
+            if wc and si:containsWeaponCategory(wc) then cat = c[2]; return end
+        end
+    end)
+    return { ft = ft, cat = cat or "other" }
+end
+
+pcall(function()
+    Events.OnHitZombie.Add(function(zombie, wielder, bodyPart, weapon)
+        if not zombie or not wielder or not isLocalPlayer(wielder) then return end
+        if _lastHitCount > 500 then _lastHit = {}; _lastHitCount = 0 end
+        if not _lastHit[zombie] then _lastHitCount = _lastHitCount + 1 end
+        _lastHit[zombie] = weaponInfo(weapon)
+    end)
+end)
+
+local function recordWeaponKill(zombie)
+    local hit = _lastHit[zombie]
+    if hit then
+        _lastHit[zombie] = nil
+        _lastHitCount = math.max(0, _lastHitCount - 1)
+    end
+    local player = getPlayer()
+    if not player or not isLocalPlayer(player) then return end
+    if not hit then
+        local byOk, by = pcall(function() return zombie:getAttackedBy() end)
+        if not byOk or by ~= player then return end
+        hit = { cat = "other" }
+    end
+    local md = player:getModData()
+    local ck = "PZCommunityRank_WK_" .. hit.cat
+    md[ck] = (tonumber(md[ck]) or 0) + 1
+    if hit.ft and hit.ft:match("^[%w_%.]+$") then
+        local tk = "PZCommunityRank_WT_" .. hit.ft
+        if not md[tk] then
+            md["PZCommunityRank_WTSet"] = (md["PZCommunityRank_WTSet"] or "") .. "|" .. hit.ft .. "|"
+        end
+        md[tk] = (tonumber(md[tk]) or 0) + 1
+    end
+end
+
 -- -- Atualizacao ao matar um zumbi (debounce: 1 sync a cada 5 kills) --
 pcall(function()
     Events.OnZombieDead.Add(function(zombie)
         if _isStartingUp then return end
         _killsSinceSync = _killsSinceSync + 1
+        pcall(recordWeaponKill, zombie)
 
         -- Acumula kill na célula de grid do jogador (heatmap)
         local ok2, player2 = pcall(getPlayer)
@@ -1852,4 +1914,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.28.0")
+RankLog.info("Mod carregado - B42.20 | v2.29.0")
