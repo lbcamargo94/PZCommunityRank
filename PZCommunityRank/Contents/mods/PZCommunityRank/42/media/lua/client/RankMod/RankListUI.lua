@@ -1,5 +1,5 @@
 -- ============================================================
---  RankListUI.lua - Tela de rank in-game (B42.19+)
+--  RankListUI.lua - Tela de rank in-game (B42.20+)
 --  Le pz_rank/pz_rank_rank.log escrito pelo PZ Rank Companion.
 -- ============================================================
 

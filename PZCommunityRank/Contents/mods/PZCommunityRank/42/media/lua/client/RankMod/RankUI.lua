@@ -1,5 +1,5 @@
 -- ============================================================
---  RankUI.lua - Janela de resultado (B42.19+)
+--  RankUI.lua - Janela de resultado (B42.20+)
 -- ============================================================
 
 require "ISUI/ISPanel"

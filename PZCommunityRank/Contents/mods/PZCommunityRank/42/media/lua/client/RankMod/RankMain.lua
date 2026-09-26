@@ -1,5 +1,5 @@
 -- ============================================================
---  RankMain.lua - Ponto de entrada (B42.19+)
+--  RankMain.lua - Ponto de entrada (B42.20+)
 -- ============================================================
 
 require "RankMod/RankLog"
@@ -527,20 +527,6 @@ local function onGameStart()
         end
     end
     pcall(function() Events.OnTick.Add(clearStartup) end)
-end
-
--- -- Comando /rank no chat -----------------------------------
-local function onChatCommand(text)
-    if text ~= "/rank" then return end
-    local player = getPlayer()
-    if not player then
-        RankLog.warn("/rank: getPlayer() retornou nil.")
-        return true
-    end
-    RankLog.info("/rank executado manualmente.")
-    RankMain.submitted[0] = false
-    triggerRank(player, 0, false)
-    return true
 end
 
 -- -- Menu de contexto ----------------------------------------
@@ -1576,11 +1562,8 @@ if not _tracksPatched then
     end)
 end
 
-if Events.OnTryTalkInChat then
-    Events.OnTryTalkInChat.Add(onChatCommand)
-else
-    RankLog.warn("OnTryTalkInChat indisponivel no B42. Comando /rank desabilitado.")
-end
+-- v2.30.1: comando /rank removido - o B42 nao tem mais OnTryTalkInChat e o
+-- "Gerar Rank" do menu de contexto (clique direito no mundo) faz o mesmo.
 
 -- -- Atualizacao + validacao ao salvar / sair do mundo -----
 -- B42: OnSave foi substituido por OnPostSave (dispara apos o save, inclusive ao sair para o menu).
@@ -1940,4 +1923,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.30.0")
+RankLog.info("Mod carregado - B42.20 | v2.30.1")

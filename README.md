@@ -27,7 +27,7 @@ Mod para **Project Zomboid Build 42+** que adiciona um sistema de ranking comuni
 
 | Build | Suporte |
 |-------|---------|
-| 42.19+ | ✔ Compatível |
+| 42.20+ | ✔ Compatível |
 | Build 41 e anteriores | ✗ Não suportado |
 
 ## Instalação

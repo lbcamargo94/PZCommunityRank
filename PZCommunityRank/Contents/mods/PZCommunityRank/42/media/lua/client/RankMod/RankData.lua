@@ -1,5 +1,5 @@
 -- ============================================================
---  RankData.lua - Coleta de dados do personagem (B42.19+)
+--  RankData.lua - Coleta de dados do personagem (B42.20+)
 -- ============================================================
 
 require "RankMod/RankLog"

@@ -1,5 +1,5 @@
 -- ============================================================
---  RankSandbox.lua - Validador de configuracoes do Sandbox (B42.19+)
+--  RankSandbox.lua - Validador de configuracoes do Sandbox (B42.20+)
 --
 --  Compara o SandboxVars ativo com as regras do desafio oficial.
 --  Abre um ISPanel de alerta quando algo diverge.
