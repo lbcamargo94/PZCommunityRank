@@ -98,6 +98,6 @@ description=Contato / Contact: lb.camargo94@gmail.com
 description=
 description=Workshop ID: 3746228308
 description=Mod ID: PZCommunityRank
-tags=Build 42;Multiplayer;Interface;Gameplay
+tags=Build 42;Interface
 visibility=public
 mods=PZCommunityRank
