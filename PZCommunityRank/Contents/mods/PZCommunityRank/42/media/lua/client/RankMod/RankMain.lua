@@ -367,6 +367,29 @@ local function onPlayerDeath(player, playerIndex)
 end
 
 -- -- Evento: inicio de partida -------------------------------
+-- v2.30.0: celula (100x100 tiles) onde o personagem NASCEU, gravada uma vez por
+-- personagem. So vale para personagem recem-criado (< 2h de jogo); quem atualiza o
+-- mod no meio da run fica -1 (sem dado), senao o "inicio" seria onde ele esta agora.
+local function recordStartCell(player)
+    if not player or not isLocalPlayer(player) then return end
+    local md = player:getModData()
+    if md["PZCommunityRank_StartGX"] ~= nil then return end
+    if (tonumber(player:getHoursSurvived()) or 999) < 2 then
+        md["PZCommunityRank_StartGX"] = math.floor(player:getX() / 100)
+        md["PZCommunityRank_StartGY"] = math.floor(player:getY() / 100)
+        RankLog.info("Inicio da run registrado (celula " .. md["PZCommunityRank_StartGX"] .. "," .. md["PZCommunityRank_StartGY"] .. ")")
+    else
+        md["PZCommunityRank_StartGX"] = -1
+        md["PZCommunityRank_StartGY"] = -1
+    end
+end
+
+pcall(function()
+    Events.OnCreatePlayer.Add(function(playerIndex, player)
+        pcall(recordStartCell, player)
+    end)
+end)
+
 local function onGameStart()
     RankMain.submitted = {}
     _killsSinceSync           = 0
@@ -396,6 +419,7 @@ local function onGameStart()
             _isStartingUp = false
             pcall(function() Events.OnTick.Remove(clearStartup) end)
             RankLog.info("OnGameStart: grace period concluido.")
+            pcall(recordStartCell, getPlayer())
 
             -- Com o mod ativo, qualquer sessao e tratada como desafio.
             -- _RankMod_PendingBrasileiraoSetup indica novo jogo via modo desafio:
@@ -1916,4 +1940,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.29.0")
+RankLog.info("Mod carregado - B42.20 | v2.30.0")

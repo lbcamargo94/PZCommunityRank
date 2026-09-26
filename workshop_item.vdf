@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.29.0 - Registra com qual arma voce mata cada zumbi (a arma do golpe final leva o abate). O site passa a mostrar sua arma preferida no perfil e as armas que mais matam zumbis no campeonato (pagina /estatisticas). A contagem comeca a partir desta atualizacao."
+	"changenote"		"v2.30.0 - Registra em qual cidade cada personagem comeca a partida (so o nome da cidade, nunca a posicao). O site passa a mostrar onde os jogadores comecam e quanto tempo sobrevive, em media, quem nasce em cada cidade. Vale para personagens criados a partir desta atualizacao."
 }

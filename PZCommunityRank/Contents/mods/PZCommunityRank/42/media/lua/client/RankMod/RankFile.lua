@@ -153,6 +153,18 @@ function RankFile.saveStats(entry)
     -- junto com o resto): wk_<tipo> = abates por tipo; wt:<item> = as 5 armas que
     -- mais mataram. Ultimo golpe define a arma (RankMain.recordWeaponKill).
     local wpart = {}
+
+    -- v2.30.0: celula onde o personagem NASCEU (RankMain.recordStartCell). O servidor
+    -- guarda so o nome da regiao (cidade), nunca a posicao.
+    pcall(function()
+        local md = getPlayer():getModData()
+        local sx = tonumber(md["PZCommunityRank_StartGX"]) or -1
+        local sy = tonumber(md["PZCommunityRank_StartGY"]) or -1
+        if sx >= 0 and sy >= 0 then
+            wpart[#wpart + 1] = string.format('"start_gx":%d,"start_gy":%d', sx, sy)
+        end
+    end)
+
     pcall(function()
         local md = getPlayer():getModData()
         for _, cat in ipairs(RankFile.WEAPON_KILL_CATS) do
