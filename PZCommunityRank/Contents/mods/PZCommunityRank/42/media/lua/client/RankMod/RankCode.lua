@@ -40,7 +40,7 @@ require "RankMod/RankModCheck"
 
 RankCode = {}
 
-local MOD_VERSION = "2.30.1"
+local MOD_VERSION = "2.31.0"
 local XOR_KEY = "PZRank-Community-2026-Key!"
 local B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
@@ -163,7 +163,8 @@ end
 -- PZRX9 slim: nome|profissao|kills|tempo|skills|status|sandbox|traits|motivo|ts|modVersion|death_cause|active_mods
 -- Stats de conquistas ficam em pz_rank_stats_<char>.log (gravado pelo RankFile.saveStats).
 -- Campo sandbox: "ok" = configuracoes validas; "invalido" = violacao detectada
--- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true)
+-- Campo motivo: "sandbox" | "debug" | "mods" | "" (vazio quando sandbox_ok=true),
+--   seguido de extras "&debug_min=<n>&preset=1&gap=<n>@<at>" (v2.31.0+, ver buildReasonExtra)
 -- Campo ts: Unix timestamp em segundos — detecta replay de codigos antigos
 -- Campo death_cause: string; vazio em syncs periodicos (so preenchido na morte)
 -- Campo active_mods: IDs dos mods ativos separados por ";", excluindo IDs internos do engine
@@ -175,6 +176,12 @@ function RankCode.generate(entry)
     local status     = entry.is_dead and "morto" or "vivo"
     local sandbox    = (entry.sandbox_ok == false) and "invalido" or "ok"
     local motivo     = (entry.sandbox_ok == false) and (entry.disqualification_reason or "sandbox") or ""
+    -- Extras (debug_min, preset, gap) depois do motivo principal, separados por "&".
+    -- Podem existir sem desclassificacao (gap e so aviso ao moderador).
+    local extra = (entry.reason_extra or ""):gsub("|", " ")
+    if extra ~= "" then
+        motivo = (motivo ~= "") and (motivo .. "&" .. extra) or extra
+    end
     local ts         = unixTimestamp()
     local deathCause = ((entry.death_cause or "")):gsub("|", " ")
 

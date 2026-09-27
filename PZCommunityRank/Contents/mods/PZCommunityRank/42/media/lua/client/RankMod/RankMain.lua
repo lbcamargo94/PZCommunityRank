@@ -39,9 +39,20 @@ local _sandboxViolationDetected = false
 -- Persiste via ModData (PZCommunityRank_DebugViolation).
 local _debugViolationDetected = false
 
+-- True se o preset do desafio foi alterado (sandbox), independente de debug.
+-- Persiste via ModData (PZCommunityRank_PresetViolation, v2.31.0+). Separado da marca de
+-- debug para que a anistia de debug concedida pelo moderador nunca cubra sandbox alterado.
+local _presetViolationDetected = false
+
 -- True se foi detectado uso de mod nao permitido durante o desafio Brasileirao.
--- Persiste via ModData (PZCommunityRank_ModViolation).
+-- Vale so para a sessao: mods nao desclassificam de forma permanente (regra do servidor),
+-- a checagem e refeita a cada sessao.
 local _modViolationDetected = false
+
+-- Possivel sessao jogada sem o mod, detectada ao carregar o save (v2.31.0+).
+-- {min = minutos de jogo sem o mod, at = tempo de jogo (min) no carregamento}.
+-- Nao desclassifica: vai no codigo como aviso para revisao do moderador.
+local _modGap = nil
 
 -- Lista de violacoes de mod da sessao atual (ex: {"NAO_PERMITIDO:SomeMod","AUSENTE:Other"}).
 -- Disponivel apenas na sessao em que a violacao foi detectada (nao persiste).
@@ -58,9 +69,24 @@ local PERIODIC_TICKS = 18000
 local _killsSinceSync = 0
 local KILLS_PER_SYNC  = 5    -- dispara sync a cada 5 kills
 
--- Gap de horas in-game sem o mod ativo que aciona ModViolation.
--- Threshold generoso (1h) para cobrir crashes/reinicializacoes sem falso positivo.
+-- Gap de horas in-game sem o mod ativo que gera aviso ao moderador.
+-- A marca de "mod ativo" e gravada a cada 10 min de jogo (markModAlive), entao o save
+-- carrega no maximo ~10 min de atraso; 1h cobre crashes sem falso positivo.
 local GAP_HOURS_THRESHOLD = 1.0
+
+-- Minutos de jogo sobrevividos (mesma unidade do tempo_min do codigo).
+local function survivedMinutes(player)
+    return math.floor((player:getHoursSurvived() or 0) * 60)
+end
+
+-- Registra no save que o mod estava ativo nesta hora de jogo. Base da deteccao de gap.
+-- Chamado a cada 10 min de jogo: o autosave e o save ao sair sempre levam um valor recente.
+-- (Antes era gravado so no silentUpdate, que pula quando nada mudou, e no OnPostSave,
+-- que roda depois do save - o valor se perdia e gerava falso positivo.)
+local function markModAlive(player)
+    if not player then return end
+    player:getModData()["PZCommunityRank_LastSyncHours"] = player:getHoursSurvived()
+end
 
 -- Caches in-memory para sets de IDs unicos: evita O(n) string:find() a cada evento.
 -- Populados a partir do ModData ao fim do grace period. Resetados em onGameStart.
@@ -85,11 +111,14 @@ local function checkAndDisqualify(player)
 
     if not presetOk then
         _sandboxViolationDetected = true
+        _presetViolationDetected  = true
         RankLog.warn(string.format(
             "DESCLASSIFICADO: %d alteracao(es) no preset do desafio detectada(s).", #violations))
         pcall(function()
             if player then
-                player:getModData()["PZCommunityRank_SandboxViolation"] = true
+                local md = player:getModData()
+                md["PZCommunityRank_SandboxViolation"] = true
+                md["PZCommunityRank_PresetViolation"]  = true
             end
         end)
     end
@@ -110,28 +139,33 @@ end
 
 -- Verifica se o modo debug esta ativo durante um jogo Brasileirao.
 -- Se ativo: desclassifica o jogador (permanente na sessao + persistido no ModData).
+-- Continua checando depois da primeira deteccao para registrar a ULTIMA hora de jogo em
+-- que o debug foi visto (PZCommunityRank_DebugSeenMin). O servidor usa esse valor na
+-- anistia: o moderador perdoa ate aquela hora, e um debug posterior desclassifica de novo.
 local function checkDebugMode(player)
-    if _debugViolationDetected then return end
     local debugActive = false
     pcall(function()
         debugActive = getCore():getDebug() == true
     end)
     if not debugActive then return end
 
-    _debugViolationDetected   = true
-    _sandboxViolationDetected = true
-    RankLog.warn("DESCLASSIFICADO: modo debug ativo durante o desafio Brasileirao.")
     pcall(function()
         if player then
             local md = player:getModData()
             md["PZCommunityRank_SandboxViolation"] = true
             md["PZCommunityRank_DebugViolation"]   = true
+            md["PZCommunityRank_DebugSeenMin"]     = survivedMinutes(player)
         end
     end)
+
+    if _debugViolationDetected then return end
+    _debugViolationDetected   = true
+    _sandboxViolationDetected = true
+    RankLog.warn("DESCLASSIFICADO: modo debug ativo durante o desafio Brasileirao.")
 end
 
 -- Verifica mods ativos contra a whitelist gerada pelo Companion.
--- Se violacoes encontradas: persiste PZCommunityRank_ModViolation e marca _modViolationDetected.
+-- Se violacoes encontradas: marca _modViolationDetected (so na sessao, ver declaracao).
 -- Retorna true se nenhuma violacao foi detectada (ou whitelist ausente).
 local function checkModViolation(player)
     if _modViolationDetected then return false end
@@ -146,12 +180,6 @@ local function checkModViolation(player)
     _modViolationList     = violations
     RankLog.warn(string.format("DESCLASSIFICADO: %d mod(s) nao permitido(s) detectado(s).", #violations))
     for _, v in ipairs(violations) do RankLog.warn("  -> " .. v) end
-
-    pcall(function()
-        if player then
-            player:getModData()["PZCommunityRank_ModViolation"] = true
-        end
-    end)
     return false
 end
 
@@ -165,6 +193,25 @@ local function buildModReason()
         cap[i] = _modViolationList[i]
     end
     return "mods:" .. table.concat(cap, ",")
+end
+
+-- Informacoes extras que vao no campo motivo do codigo, depois do motivo principal,
+-- separadas por "&" (v2.31.0+; o servidor le a partir da v4.28.0):
+--   "debug_min=<n>": ultima hora de jogo (min) em que o debug foi visto - base da anistia
+--   "preset=1":      preset alterado alem do debug - a anistia de debug nao cobre
+--   "gap=<n>@<at>":  possivel sessao sem o mod - aviso ao moderador, nao desclassifica
+local function buildReasonExtra(player)
+    local extra = {}
+    if _debugViolationDetected then
+        local seen = nil
+        pcall(function() seen = player:getModData()["PZCommunityRank_DebugSeenMin"] end)
+        if seen then extra[#extra + 1] = "debug_min=" .. math.floor(seen) end
+        if _presetViolationDetected then extra[#extra + 1] = "preset=1" end
+    end
+    if _modGap then
+        extra[#extra + 1] = string.format("gap=%d@%d", _modGap.min, _modGap.at)
+    end
+    return table.concat(extra, "&")
 end
 
 -- Coleta dados, gera codigo, salva arquivo e abre a UI de resultado.
@@ -213,6 +260,7 @@ local function triggerRank(player, playerIndex, isDead, deathCause)
             entry.disqualification_reason = "sandbox"
         end
     end
+    pcall(function() entry.reason_extra = buildReasonExtra(player) end)
 
     local code = RankCode.generate(entry)
     if not RankCode.isValid(code) then
@@ -266,9 +314,16 @@ local function silentUpdate(player, playerIndex)
             entry.disqualification_reason = "sandbox"
         end
     end
+    pcall(function() entry.reason_extra = buildReasonExtra(player) end)
 
     local code = RankCode.generate(entry)
     if not RankCode.isValid(code) then return end
+
+    -- Registra hora atual para detectar gap de jogo sem o mod na proxima sessao.
+    -- Antes do dedup: estado inalterado ainda significa que o mod esta ativo.
+    if _isChallengeGame then
+        pcall(markModAlive, player)
+    end
 
     if code == _lastSilentCode then
         RankLog.info("silentUpdate: estado inalterado, arquivo nao regravado")
@@ -282,13 +337,6 @@ local function silentUpdate(player, playerIndex)
     pcall(function() RankFile.saveStats(entry) end)
     pcall(function() RankFile.saveManifest(entry) end)
     pcall(function() RankSandboxExport.export(entry.character_name) end)
-
-    -- Registra hora atual para detectar gap de jogo sem o mod na proxima sessao
-    if _isChallengeGame then
-        pcall(function()
-            player:getModData()["PZCommunityRank_LastSyncHours"] = player:getHoursSurvived()
-        end)
-    end
 
     RankLog.info("silentUpdate: arquivo sincronizado - " .. (entry.character_name or "?"))
 end
@@ -398,7 +446,9 @@ local function onGameStart()
     _isChallengeGame          = false
     _sandboxViolationDetected = false
     _debugViolationDetected   = false
+    _presetViolationDetected  = false
     _modViolationDetected     = false
+    _modGap                   = nil
     _lootedBldCache     = {}
     _sleepLocCache      = {}
     _spiffoCache        = {}
@@ -452,31 +502,52 @@ local function onGameStart()
                 if p2 and p2:getModData()["PZCommunityRank_DebugViolation"] then
                     _debugViolationDetected   = true
                     _sandboxViolationDetected = true
-                    RankLog.warn("OnGameStart: save com desclassificacao por debug previa.")
+                    local md = p2:getModData()
+                    -- Marca gravada antes da v2.31.0 nao tem a hora do debug: usa a hora
+                    -- atual (limite superior - o debug aconteceu em algum momento antes).
+                    if not md["PZCommunityRank_DebugSeenMin"] then
+                        md["PZCommunityRank_DebugSeenMin"] = survivedMinutes(p2)
+                    end
+                    RankLog.warn(string.format(
+                        "OnGameStart: save com desclassificacao por debug previa (visto ate %d min de jogo).",
+                        md["PZCommunityRank_DebugSeenMin"]))
                 end
             end)
             pcall(function()
                 local p2 = getPlayer()
+                if p2 and p2:getModData()["PZCommunityRank_PresetViolation"] then
+                    _presetViolationDetected = true
+                end
+            end)
+            pcall(function()
+                -- Ate a v2.30.1 a marca de mod ficava no save para sempre - inclusive a
+                -- gerada pelo falso positivo de gap. Mods nao sao permanentes: remove.
+                local p2 = getPlayer()
                 if p2 and p2:getModData()["PZCommunityRank_ModViolation"] then
-                    _modViolationDetected = true
-                    RankLog.warn("OnGameStart: save com desclassificacao por mod nao permitido previa.")
+                    p2:getModData()["PZCommunityRank_ModViolation"] = nil
+                    RankLog.info("OnGameStart: marca antiga de mod removida (mods sao verificados a cada sessao).")
                 end
             end)
 
             -- Detecta gap de horas jogadas sem o mod ativo (bypass via desativacao do mod).
+            -- Nao desclassifica: vai como aviso no codigo para o moderador revisar.
             pcall(function()
                 local p2 = getPlayer()
                 if not p2 then return end
                 local md = p2:getModData()
                 local lastKnownHours = md["PZCommunityRank_LastSyncHours"]
-                if not lastKnownHours then return end
                 local currentHours = p2:getHoursSurvived()
+                md["PZCommunityRank_LastSyncHours"] = currentHours
+                -- Valor gravado por versao < v2.31.0 pode estar atrasado (falso positivo):
+                -- no primeiro carregamento com a versao nova, so passa a confiar dali em diante.
+                local trusted = md["PZCommunityRank_AliveTrackV2"] == true
+                md["PZCommunityRank_AliveTrackV2"] = true
+                if not lastKnownHours or not trusted then return end
                 local gap = currentHours - lastKnownHours
                 if gap > GAP_HOURS_THRESHOLD then
-                    _modViolationDetected = true
-                    md["PZCommunityRank_ModViolation"] = true
+                    _modGap = { min = math.floor(gap * 60), at = survivedMinutes(p2) }
                     RankLog.warn(string.format(
-                        "OnGameStart: %.1fh sem mod detectado (last=%.2f atual=%.2f) - DESCLASSIFICADO.",
+                        "OnGameStart: possivel sessao sem o mod: %.1fh de jogo (last=%.2f atual=%.2f) - aviso enviado ao moderador.",
                         gap, lastKnownHours, currentHours))
                 end
             end)
@@ -1816,6 +1887,17 @@ pcall(function()
     end)
 end)
 
+-- -- Marca de "mod ativo" a cada 10 min de jogo -------------
+-- So grava no ModData (sem sync nem arquivo): o proximo save leva o valor atualizado.
+pcall(function()
+    Events.EveryTenMinutes.Add(function()
+        if _isStartingUp or not _isChallengeGame then return end
+        local ok, player = pcall(getPlayer)
+        if not ok or not player or not isLocalPlayer(player) then return end
+        pcall(markModAlive, player)
+    end)
+end)
+
 -- -- Atualizacao a cada novo dia no jogo --------------------
 pcall(function()
     Events.EveryDays.Add(function()
@@ -1923,4 +2005,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.30.1")
+RankLog.info("Mod carregado - B42.20 | v2.31.0")
