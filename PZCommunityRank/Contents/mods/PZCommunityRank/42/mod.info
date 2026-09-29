@@ -1,7 +1,7 @@
 name=PZ Community Rank
 id=PZCommunityRank
 description=Mod oficial do Brasileirao PZ. Rastreia sua run e sincroniza automaticamente com o ranking via PZ Rank Companion. Somente single player, Build 42.20+. Cadastre-se em pzrank.com.br para participar.
-modversion=2.31.0
+modversion=2.31.1
 versionMin=42.20.0
 pzversion=42
 poster=poster.png

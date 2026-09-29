@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.31.0 - Corrigido o aviso falso de \"horas jogadas sem o mod\" que aparecia no log ao carregar o save. A checagem agora so avisa a moderacao, sem desclassificar, e a marca antiga de mod que ficava presa no save e removida automaticamente. O mod tambem passa a registrar a hora do jogo em que o modo debug foi visto, o que permite a moderacao analisar e reabilitar casos de engano. Inclui a v2.30.1: o mod declara compatibilidade com o Build 42.20 ou mais novo, e o comando /rank do chat foi removido (para gerar o rank manualmente, clique com o botao direito no mundo e escolha Gerar Rank)."
+	"changenote"		"v2.31.1 - O modo debug agora e verificado assim que o save carrega, e nao so alguns minutos depois. Corrigido um caso em que uma run reabilitada pela moderacao era desclassificada de novo ao atualizar o mod, mesmo sem uso de debug."
 }

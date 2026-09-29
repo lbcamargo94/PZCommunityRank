@@ -155,6 +155,7 @@ local function checkDebugMode(player)
             md["PZCommunityRank_SandboxViolation"] = true
             md["PZCommunityRank_DebugViolation"]   = true
             md["PZCommunityRank_DebugSeenMin"]     = survivedMinutes(player)
+            md["PZCommunityRank_DebugSeenEstimated"] = nil  -- hora real, nao mais estimada
         end
     end)
 
@@ -198,6 +199,7 @@ end
 -- Informacoes extras que vao no campo motivo do codigo, depois do motivo principal,
 -- separadas por "&" (v2.31.0+; o servidor le a partir da v4.28.0):
 --   "debug_min=<n>": ultima hora de jogo (min) em que o debug foi visto - base da anistia
+--   "debug_est=1":   essa hora e estimada (marca de antes da v2.31.0, sem hora registrada)
 --   "preset=1":      preset alterado alem do debug - a anistia de debug nao cobre
 --   "gap=<n>@<at>":  possivel sessao sem o mod - aviso ao moderador, nao desclassifica
 local function buildReasonExtra(player)
@@ -206,6 +208,9 @@ local function buildReasonExtra(player)
         local seen = nil
         pcall(function() seen = player:getModData()["PZCommunityRank_DebugSeenMin"] end)
         if seen then extra[#extra + 1] = "debug_min=" .. math.floor(seen) end
+        local estimated = false
+        pcall(function() estimated = player:getModData()["PZCommunityRank_DebugSeenEstimated"] == true end)
+        if estimated then extra[#extra + 1] = "debug_est=1" end
         if _presetViolationDetected then extra[#extra + 1] = "preset=1" end
     end
     if _modGap then
@@ -504,13 +509,18 @@ local function onGameStart()
                     _sandboxViolationDetected = true
                     local md = p2:getModData()
                     -- Marca gravada antes da v2.31.0 nao tem a hora do debug: usa a hora
-                    -- atual (limite superior - o debug aconteceu em algum momento antes).
+                    -- atual (limite superior - o debug aconteceu em algum momento antes)
+                    -- e marca como ESTIMADA (debug_est=1). Sem isso, uma anistia dada pela
+                    -- analise dos logs era derrubada pela propria hora do carregamento.
+                    -- Debug visto de verdade depois substitui a estimativa (checkDebugMode).
                     if not md["PZCommunityRank_DebugSeenMin"] then
-                        md["PZCommunityRank_DebugSeenMin"] = survivedMinutes(p2)
+                        md["PZCommunityRank_DebugSeenMin"]       = survivedMinutes(p2)
+                        md["PZCommunityRank_DebugSeenEstimated"] = true
                     end
                     RankLog.warn(string.format(
-                        "OnGameStart: save com desclassificacao por debug previa (visto ate %d min de jogo).",
-                        md["PZCommunityRank_DebugSeenMin"]))
+                        "OnGameStart: save com desclassificacao por debug previa (visto ate %d min de jogo%s).",
+                        md["PZCommunityRank_DebugSeenMin"],
+                        md["PZCommunityRank_DebugSeenEstimated"] and ", hora estimada" or ""))
                 end
             end)
             pcall(function()
@@ -527,6 +537,15 @@ local function onGameStart()
                     p2:getModData()["PZCommunityRank_ModViolation"] = nil
                     RankLog.info("OnGameStart: marca antiga de mod removida (mods sao verificados a cada sessao).")
                 end
+            end)
+
+            -- Debug e ligado na abertura do jogo: checa ja no carregamento (v2.31.1).
+            -- Antes a primeira checagem era ~5 min depois ou no save - uma sessao curta
+            -- so era pega no save ao sair, depois de gravado, e a marca se perdia.
+            -- Checando aqui, o proximo save (autosave ou ao sair) ja leva a marca.
+            pcall(function()
+                local p2 = getPlayer()
+                if p2 then checkDebugMode(p2) end
             end)
 
             -- Detecta gap de horas jogadas sem o mod ativo (bypass via desativacao do mod).
@@ -2005,4 +2024,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.31.0")
+RankLog.info("Mod carregado - B42.20 | v2.31.1")
