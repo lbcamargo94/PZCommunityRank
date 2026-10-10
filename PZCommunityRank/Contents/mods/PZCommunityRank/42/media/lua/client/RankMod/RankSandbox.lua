@@ -186,34 +186,17 @@ local function valuesMatch(actual, expected, tol)
     return actual == expected
 end
 
--- -- Carencia de transicao do preset (v2.32.0) --------------------------------
--- Quando um valor do preset muda, o valor ANTIGO tambem e aceito por alguns dias, para
--- ninguem ser desclassificado na troca (ex.: a reaplicacao do preset falhar em algum save).
--- 10/10/2026: ZombieLore.DisableFakeDead 2 -> 1 (desempenho - proposta dos jogadores:
--- hordas abatidas deixavam zumbis "fingindo de mortos" ativos perto do jogador).
-local TRANSITION_UNTIL  = 1792119599   -- 15/10/2026 23:59:59 (Brasilia)
-local TRANSITION_ACCEPT = {
-    ["ZombieLore.DisableFakeDead"] = { 1, 2 },
+-- -- Configuracoes fora da verificacao (v2.32.1) ---------------------------------
+-- O valor do preset continua sendo APLICADO ao carregar o save (applyFullPreset), mas nao
+-- e conferido: divergencia nao corrige nem desclassifica. Decisao da organizacao em
+-- 10/10/2026, depois da troca de ZombieLore.DisableFakeDead de 2 para 1 (v2.32.0), para
+-- ninguem ser desclassificado por essa opcao. Substitui a carencia com prazo da v2.32.0.
+local UNVERIFIED_KEYS = {
+    ["ZombieLore.DisableFakeDead"] = true,
 }
 
-local function nowEpoch()
-    local ok, ms = pcall(function()
-        return luajava.bindClass("java.lang.System"):currentTimeMillis()
-    end)
-    if ok and ms then return math.floor(tonumber(tostring(ms)) / 1000) end
-    local ok2, t = pcall(os.time)
-    if ok2 and t then return t end
-    return 0
-end
-
--- true se o valor diverge do preset mas ainda vale pela carencia de transicao
-local function acceptedInTransition(key, actual)
-    local accepted = TRANSITION_ACCEPT[key]
-    if not accepted or nowEpoch() > TRANSITION_UNTIL then return false end
-    for _, v in ipairs(accepted) do
-        if valuesMatch(actual, v, 0.01) then return true end
-    end
-    return false
+local function isUnverified(key)
+    return UNVERIFIED_KEYS[key] == true
 end
 
 -- -- Validacao principal ----------------------------------------------------
@@ -228,8 +211,9 @@ function RankSandbox.validate()
         if actual == nil then
             table.insert(missing, { key = rule.key, label = rule.label })
             RankLog.warn("SandboxVars." .. rule.key .. " nao encontrado")
-        elseif not valuesMatch(actual, rule.expected, rule.tol)
-               and not acceptedInTransition(rule.key, actual) then
+        elseif isUnverified(rule.key) then
+            RankLog.info("NAO VERIFICADO - " .. rule.label .. " = " .. tostring(actual))
+        elseif not valuesMatch(actual, rule.expected, rule.tol) then
             table.insert(violations, {
                 label    = rule.label,
                 expected = rule.expected,
@@ -366,8 +350,8 @@ function RankSandbox.verifyFullPreset()
                     flatCheck(v, key)
                 elseif type(v) == "number" or type(v) == "boolean" then
                     local actual = readVar(key)
-                    if actual ~= nil and not valuesMatch(actual, v, 0.01)
-                       and not acceptedInTransition(key, actual) then
+                    if actual ~= nil and not isUnverified(key)
+                       and not valuesMatch(actual, v, 0.01) then
                         table.insert(violations, { key = key, expected = v, got = actual })
                     end
                 end
