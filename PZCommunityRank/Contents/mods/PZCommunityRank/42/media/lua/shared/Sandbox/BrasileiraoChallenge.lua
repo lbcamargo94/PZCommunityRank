@@ -8,7 +8,7 @@
 --  e mantidos em sincronia com RankSandbox.lua.
 -- ============================================================
 BRASILEIRAO_CHALLENGE_PRESET = {
-    Version = 7,
+    Version = 8,  -- 10/10/2026: DisableFakeDead 2 -> 1
 
     -- ZUMBIS - Populacao
     ZombieConfig = {
@@ -56,7 +56,7 @@ BRASILEIRAO_CHALLENGE_PRESET = {
         ZombiesMaxDefense        = 90,
         ChanceOfAttachedWeapon   = 6,
         ZombiesFallDamage        = 1.0,
-        DisableFakeDead          = 2,   -- Total (incl. mortos pelo jogador)
+        DisableFakeDead          = 1,   -- So Zumbis do Mundo (v2.32.0; antes 2 = Mundo e de Combate)
         PlayerSpawnZombieRemoval = 4,
         FenceThumpersRequired    = 25,
         FenceDamageMultiplier    = 2.0,

@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.31.1 - O modo debug agora e verificado assim que o save carrega, e nao so alguns minutos depois. Corrigido um caso em que uma run reabilitada pela moderacao era desclassificada de novo ao atualizar o mod, mesmo sem uso de debug."
+	"changenote"		"v2.32.0 - Ajuste no preset do desafio para melhorar o desempenho: zumbis abatidos pelo jogador nao se levantam mais fingindo de mortos (a opcao Reanimacao de Zumbis que Parecem Mortos passa a valer so para os zumbis do mundo). Nao e preciso mudar nada no sandbox: o mod aplica o valor novo sozinho ao carregar o save. Ate 15/10 o valor antigo tambem e aceito, para ninguem ser desclassificado na troca."
 }

@@ -14,7 +14,9 @@
 --  ZombieLore.Sight:        1=Aguia 2=Normal  3=Ruim   4=Aleat.  5=Aleat.(Normal/Ruim)
 --  ZombieLore.Memory:       1=Longo 2=Normal  3=Curto  4=Nenhum  5=Aleat.
 --  ZombieLore.Cognition:    1=Avancado(abre portas) 2=Normal 3=Basico 4=Aleat.
---  ZombieLore.DisableFakeDead: 1=Parcial 2=Total(incl.mortos pelo jogador) 3=Nenhum
+--  ZombieLore.DisableFakeDead (Reanimacao de Zumbis que Parecem Mortos):
+--      1=Zumbis do Mundo  2=Zumbis do Mundo e de Combate  3=Nunca
+--      (o valor e QUEM pode levantar; 3 desliga. Ate a v2.31.1 estava 2.)
 --  ZombieLore.CrawlUnderVehicle: 1=SoRastejantes 2=ExtRaro..7=Sempre
 --  WaterShut / ElecShut:    1=Instantaneo 2=0-30 Dias ...
 --  AlarmDecay:              1=Instantaneo .. 6=0-5 Anos
@@ -67,7 +69,7 @@ local RULES = {
     { key = "ZombieConfig.RallyTravelDistance",        expected = 20,   label = "Distancia Rally (20)" },
     { key = "ZombieConfig.RallyGroupSeparation",       expected = 15,   label = "Separacao de Horda (15)" },
     { key = "ZombieConfig.RallyGroupRadius",           expected = 3,    label = "Raio de Horda (3)" },
-    { key = "ZombieLore.DisableFakeDead",              expected = 2,    label = "Fake Dead Total (2)" },
+    { key = "ZombieLore.DisableFakeDead",              expected = 1,    label = "Reanimacao de Mortos Falsos (So do Mundo=1)" },
     { key = "ZombieLore.ZombiesCrawlersDragDown",      expected = true, label = "Rastejadores Derrubam" },
 
     -- [ LOOT ] - todas as 22 categorias do B42 (0.04 = Muito Baixo)
@@ -184,6 +186,36 @@ local function valuesMatch(actual, expected, tol)
     return actual == expected
 end
 
+-- -- Carencia de transicao do preset (v2.32.0) --------------------------------
+-- Quando um valor do preset muda, o valor ANTIGO tambem e aceito por alguns dias, para
+-- ninguem ser desclassificado na troca (ex.: a reaplicacao do preset falhar em algum save).
+-- 10/10/2026: ZombieLore.DisableFakeDead 2 -> 1 (desempenho - proposta dos jogadores:
+-- hordas abatidas deixavam zumbis "fingindo de mortos" ativos perto do jogador).
+local TRANSITION_UNTIL  = 1792119599   -- 15/10/2026 23:59:59 (Brasilia)
+local TRANSITION_ACCEPT = {
+    ["ZombieLore.DisableFakeDead"] = { 1, 2 },
+}
+
+local function nowEpoch()
+    local ok, ms = pcall(function()
+        return luajava.bindClass("java.lang.System"):currentTimeMillis()
+    end)
+    if ok and ms then return math.floor(tonumber(tostring(ms)) / 1000) end
+    local ok2, t = pcall(os.time)
+    if ok2 and t then return t end
+    return 0
+end
+
+-- true se o valor diverge do preset mas ainda vale pela carencia de transicao
+local function acceptedInTransition(key, actual)
+    local accepted = TRANSITION_ACCEPT[key]
+    if not accepted or nowEpoch() > TRANSITION_UNTIL then return false end
+    for _, v in ipairs(accepted) do
+        if valuesMatch(actual, v, 0.01) then return true end
+    end
+    return false
+end
+
 -- -- Validacao principal ----------------------------------------------------
 
 function RankSandbox.validate()
@@ -196,7 +228,8 @@ function RankSandbox.validate()
         if actual == nil then
             table.insert(missing, { key = rule.key, label = rule.label })
             RankLog.warn("SandboxVars." .. rule.key .. " nao encontrado")
-        elseif not valuesMatch(actual, rule.expected, rule.tol) then
+        elseif not valuesMatch(actual, rule.expected, rule.tol)
+               and not acceptedInTransition(rule.key, actual) then
             table.insert(violations, {
                 label    = rule.label,
                 expected = rule.expected,
@@ -333,7 +366,8 @@ function RankSandbox.verifyFullPreset()
                     flatCheck(v, key)
                 elseif type(v) == "number" or type(v) == "boolean" then
                     local actual = readVar(key)
-                    if actual ~= nil and not valuesMatch(actual, v, 0.01) then
+                    if actual ~= nil and not valuesMatch(actual, v, 0.01)
+                       and not acceptedInTransition(key, actual) then
                         table.insert(violations, { key = key, expected = v, got = actual })
                     end
                 end
