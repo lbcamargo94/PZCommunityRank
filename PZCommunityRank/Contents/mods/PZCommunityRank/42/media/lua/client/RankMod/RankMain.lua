@@ -39,6 +39,11 @@ local _sandboxViolationDetected = false
 -- Persiste via ModData (PZCommunityRank_DebugViolation).
 local _debugViolationDetected = false
 
+-- Mod fora da Oficina da Steam (v2.33.0). A lista fica no ModData para sempre
+-- (PZCommunityRank_LocalMods): tirar o mod depois nao limpa a run.
+local _localModsChecked = false
+local _localModsActive  = false
+
 -- True se o preset do desafio foi alterado (sandbox), independente de debug.
 -- Persiste via ModData (PZCommunityRank_PresetViolation, v2.31.0+). Separado da marca de
 -- debug para que a anistia de debug concedida pelo moderador nunca cubra sandbox alterado.
@@ -184,6 +189,33 @@ local function checkModViolation(player)
     return false
 end
 
+-- Procura mods fora da Oficina uma vez por sessao (os mods nao mudam com o jogo aberto) e
+-- grava no save. Quem desclassifica e o servidor, ao receber "local_mods=" no codigo.
+local function checkLocalMods(player)
+    if _localModsChecked or not player then return end
+    _localModsChecked = true
+
+    local ids = RankModCheck.getLocalModIds()
+    if #ids == 0 then return end
+    _localModsActive = true
+
+    local md = player:getModData()
+    local merged, seen = {}, {}
+    for old in tostring(md["PZCommunityRank_LocalMods"] or ""):gmatch("[^,]+") do
+        seen[old] = true
+        merged[#merged + 1] = old
+    end
+    for _, id in ipairs(ids) do
+        local clean = id:gsub("[&|,=]", "")
+        if not seen[clean] then
+            seen[clean] = true
+            merged[#merged + 1] = clean
+        end
+    end
+    md["PZCommunityRank_LocalMods"] = table.concat(merged, ",")
+    RankLog.warn("DESCLASSIFICADO: mod(s) fora da Oficina da Steam: " .. md["PZCommunityRank_LocalMods"])
+end
+
 -- Retorna a string de motivo de desclassificacao por mod, incluindo a lista de IDs.
 -- Formato: "mods:NAO_PERMITIDO:id1,AUSENTE:id2" (maximo 10 entradas para nao inflar o codigo).
 -- Retorna "mods" se a lista nao estiver disponivel (violacao restaurada via ModData).
@@ -202,6 +234,8 @@ end
 --   "debug_est=1":   essa hora e estimada (marca de antes da v2.31.0, sem hora registrada)
 --   "preset=1":      preset alterado alem do debug - a anistia de debug nao cobre
 --   "gap=<n>@<at>":  possivel sessao sem o mod - aviso ao moderador, nao desclassifica
+--   "local_mods=<ids>": mods fora da Oficina - o servidor desclassifica (v2.33.0)
+--   "local_min=<n>":  ultima hora de jogo (min) com esses mods - base da anistia
 local function buildReasonExtra(player)
     local extra = {}
     if _debugViolationDetected then
@@ -216,6 +250,16 @@ local function buildReasonExtra(player)
     if _modGap then
         extra[#extra + 1] = string.format("gap=%d@%d", _modGap.min, _modGap.at)
     end
+    pcall(function()
+        local md = player:getModData()
+        local localMods = md["PZCommunityRank_LocalMods"]
+        if not localMods or localMods == "" then return end
+        if _localModsActive or not md["PZCommunityRank_LocalSeenMin"] then
+            md["PZCommunityRank_LocalSeenMin"] = survivedMinutes(player)
+        end
+        extra[#extra + 1] = "local_mods=" .. localMods
+        extra[#extra + 1] = "local_min=" .. math.floor(md["PZCommunityRank_LocalSeenMin"])
+    end)
     return table.concat(extra, "&")
 end
 
@@ -242,6 +286,7 @@ local function triggerRank(player, playerIndex, isDead, deathCause)
     -- tick periodico nao tenha disparado ainda (ex: morte nos primeiros 5 minutos).
     pcall(function() checkDebugMode(player) end)
     pcall(function() checkModViolation(player) end)
+    pcall(function() checkLocalMods(player) end)
 
     -- Valida sandbox: desclassificacao por preset alterado tem prioridade sobre check pontual.
     local sandboxOk = true
@@ -453,6 +498,8 @@ local function onGameStart()
     _debugViolationDetected   = false
     _presetViolationDetected  = false
     _modViolationDetected     = false
+    _localModsChecked         = false
+    _localModsActive          = false
     _modGap                   = nil
     _lootedBldCache     = {}
     _sleepLocCache      = {}
@@ -545,7 +592,10 @@ local function onGameStart()
             -- Checando aqui, o proximo save (autosave ou ao sair) ja leva a marca.
             pcall(function()
                 local p2 = getPlayer()
-                if p2 then checkDebugMode(p2) end
+                if p2 then
+                    checkDebugMode(p2)
+                    checkLocalMods(p2)
+                end
             end)
 
             -- Detecta gap de horas jogadas sem o mod ativo (bypass via desativacao do mod).
@@ -1668,6 +1718,7 @@ pcall(function()
             local p2 = player
             pcall(function() checkDebugMode(p2) end)
             pcall(function() checkModViolation(p2) end)
+            pcall(function() checkLocalMods(p2) end)
             pcall(function() checkAndDisqualify(p2) end)
         else
             pcall(function() RankSandbox.check(false) end)
@@ -1940,6 +1991,7 @@ pcall(function()
             local p2 = player
             pcall(function() checkDebugMode(p2) end)
             pcall(function() checkModViolation(p2) end)
+            pcall(function() checkLocalMods(p2) end)
             pcall(function() checkAndDisqualify(p2) end)
         end
         safeSilentUpdate(player, 0)
@@ -1978,6 +2030,7 @@ Events.OnTick.Add(function()
         local capturedPlayer = player
         pcall(function() checkDebugMode(capturedPlayer) end)
         pcall(function() checkModViolation(capturedPlayer) end)
+        pcall(function() checkLocalMods(capturedPlayer) end)
         local presetOk = false
         pcall(function() presetOk = checkAndDisqualify(capturedPlayer) end)
         if not presetOk then

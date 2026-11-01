@@ -235,6 +235,42 @@ function RankModCheck.getActiveModIds()
     return out
 end
 
+-- Mods ativos com copia fora da Oficina da Steam (v2.33.0), inclusive o proprio
+-- PZCommunityRank. Mod da Oficina fica em .../108600/<workshop id>/mods/<nome>; qualquer
+-- outro caminho (<Zomboid>/mods, <Zomboid>/Workshop) pode ser editado pelo jogador. Olha
+-- todas as pastas instaladas porque uma copia local tem prioridade sobre a da Oficina
+-- com o mesmo ID. Na duvida (API indisponivel), nao aponta ninguem.
+function RankModCheck.getLocalModIds()
+    local active = {}
+    local listOk, list = pcall(getActivatedMods)
+    if not listOk or not list then
+        RankLog.warn("getLocalModIds: getActivatedMods indisponivel")
+        return {}
+    end
+    local activeIds = {}
+    collectJavaList("[Local]", list, activeIds, {})
+    for _, id in ipairs(activeIds) do
+        active[(id:gsub("^\\+", ""))] = true
+    end
+
+    local out, seen = {}, {}
+    pcall(function()
+        for _, directory in ipairs(getModDirectoryTable()) do
+            local path = tostring(directory):gsub("\\", "/")
+            if not path:match("/%d+/mods/[^/]+/?$") then
+                local modInfo = getModInfo(directory)
+                local idOk, id = pcall(function() return modInfo:getId() end)
+                if idOk and id and active[id] and not seen[id]
+                    and id ~= "base" and id ~= "Base" and id ~= "pzexo" then
+                    seen[id] = true
+                    out[#out + 1] = id
+                end
+            end
+        end
+    end)
+    return out
+end
+
 -- Verifica mods ativos contra a whitelist.
 --
 -- Retorna:
