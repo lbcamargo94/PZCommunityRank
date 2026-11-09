@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.33.0 - Mod carregado de pasta local, fora da Oficina da Steam, agora desclassifica a run, mesmo com ID permitido. Remover o mod depois nao reabilita; so a moderacao reverte. Apague as copias locais em Zomboid/mods antes de jogar. Versao obrigatoria a partir de 02/11, 01:10 (Brasilia)."
+	"changenote"		"v2.33.0 - Volta para a versao anterior: a v2.34.0, em teste, foi removida. A prisao de Rosewood nao recebe mais os 50.000 zumbis. Em saves onde eles ja foram criados, os zumbis continuam no mapa."
 }
