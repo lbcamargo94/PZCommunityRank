@@ -136,33 +136,30 @@ local function collectJavaList(label, javaList, out, seen)
 end
 
 -- Coleta os mod IDs ativos.
--- M1 e M2: APIs Java confirmadas seguras (retornam apenas IDs internos no B42).
--- M6: le mods.txt do save atual via getFileReader (puro Lua, sem Java internals).
---     API correta B42: getWorld():getWorld() = nome do save
---                      getWorld():getGameMode() = modo (Survival/Sandbox)
+-- Ate a v2.35.0 a lista vinha so do M7 (os M1 getActiveMods e M2 ModManager nao existem no
+-- B42 e sempre falhavam). O M7 le os dados do save pelo nome do mundo e voltava vazio em
+-- jogo novo ainda nao salvo (runs de 0 dia chegavam ao site sem mods, 14/11/2026).
+-- M0 (v2.36.0): getActivatedMods(), a lista do jogo em andamento - a mesma do menu de
+-- pausa (ISPauseModListUI). O M7 continua como reserva e as duas listas se somam.
 local function safeGetActiveModList()
     local mods = {}
     local seen = {}
 
-    -- M1: global getActiveMods()
-    local ok1, list1 = pcall(getActiveMods)
-    if ok1 then
-        collectJavaList("[M1-global]", list1, mods, seen)
-    else
-        RankLog.warn("[M1-global] getActiveMods() excecao: " .. tostring(list1))
-    end
-
-    -- M2: ModManager:getActiveMods()
-    pcall(function()
-        local mgr = ModManager
-        if not mgr then RankLog.warn("[M2-ModManager] classe nao encontrada"); return end
-        local ok2, list2 = pcall(function() return mgr:getActiveMods() end)
-        if ok2 then
-            collectJavaList("[M2-ModManager]", list2, mods, seen)
-        else
-            RankLog.warn("[M2-ModManager] falhou: " .. tostring(list2))
+    -- M0: getActivatedMods() - no B42 os IDs podem vir com "\" na frente (como no mods.txt)
+    local ok0, list0 = pcall(getActivatedMods)
+    if ok0 and list0 then
+        local raw = {}
+        collectJavaList("[M0-activated]", list0, raw, {})
+        for _, id in ipairs(raw) do
+            local clean = id:gsub("^\\+", "")
+            if clean ~= "" and not seen[clean] then
+                seen[clean] = true
+                mods[#mods + 1] = clean
+            end
         end
-    end)
+    else
+        RankLog.warn("[M0-activated] getActivatedMods() indisponivel: " .. tostring(list0))
+    end
 
     -- M7: getSaveInfo(getWorld():getWorld()).activeMods:getMods()
     -- API oficial PZ B42 para mods do save atual. getSaveInfo e uma funcao Lua nativa
@@ -223,11 +220,15 @@ end
 
 -- Retorna lista de mod IDs ativos, excluindo IDs internos do engine.
 -- Usado por RankCode para incluir a lista no payload do codigo PZR.
+-- O proprio PZCommunityRank vai na lista (v2.36.0): com ele rodando, a coleta sempre acha
+-- pelo menos ele, entao lista vazia no site = coleta falhou (antes podia ser "so o mod do
+-- rank ativo", e o servidor nao conseguia cobrar os obrigatorios).
+local ENGINE_IDS = { ["pzexo"] = true, ["base"] = true, ["Base"] = true }
 function RankModCheck.getActiveModIds()
     local all  = safeGetActiveModList()
     local out  = {}
     for _, id in ipairs(all) do
-        if not INTERNAL_IDS[id] then
+        if not ENGINE_IDS[id] then
             out[#out + 1] = id
         end
     end
