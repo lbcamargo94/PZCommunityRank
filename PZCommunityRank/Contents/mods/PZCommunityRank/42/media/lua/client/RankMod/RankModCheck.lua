@@ -271,6 +271,24 @@ function RankModCheck.getLocalModIds()
     return out
 end
 
+-- PZ Optimization (xD3I/PZ_Optimization) instalado na pasta do jogo (v2.35.0): proibido no
+-- campeonato. Ele nao e um mod da lista: troca classes Java do jogo e poe Lua solta em
+-- media/lua, entao vale com ou sem o item da Oficina ativo. Dois sinais, qualquer um basta:
+--   1. PzoptLogInfo: funcao global do shared/pzopt/pzopt_log.lua que so o instalador poe
+--      na pasta do jogo (a traducao PT-BR nao traz esse arquivo).
+--   2. getPerformance():hasPzoptOptions: metodo da classe Java substituida. Checado com
+--      type() sem chamar - chamar um metodo Java que nao existe lanca excecao mesmo no pcall.
+function RankModCheck.isPzoptInstalled()
+    if type(PzoptLogInfo) == "function" then return true end
+    local found = false
+    pcall(function()
+        local perf = getPerformance()
+        found = perf ~= nil and (type(perf.hasPzoptOptions) == "function"
+            or type(perf.getPzoptOption) == "function")
+    end)
+    return found
+end
+
 -- Verifica mods ativos contra a whitelist.
 --
 -- Retorna:

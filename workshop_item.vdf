@@ -3,5 +3,5 @@
 	"appid"			"108600"
 	"publishedfileid"	"3746228308"
 	"contentfolder"		"D:\workspace\PZCommunityRank\PZCommunityRank\Contents"
-	"changenote"		"v2.33.0 - Volta para a versao anterior: a v2.34.0, em teste, foi removida. A prisao de Rosewood nao recebe mais os 50.000 zumbis. Em saves onde eles ja foram criados, os zumbis continuam no mapa."
+	"changenote"		"v2.35.0 - O PZ Optimization e proibido no campeonato: com ele instalado na pasta do jogo, a run e desclassificada, mesmo sem o item da Oficina ativo. Desinstalar depois nao reabilita; so a moderacao reverte. Para jogar o campeonato, desinstale pelo uninstall do PZ Optimization e apague a opcao de inicializacao da Steam. Versao obrigatoria a partir de 16/11, 11h (Brasilia)."
 }

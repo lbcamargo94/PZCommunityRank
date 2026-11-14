@@ -44,6 +44,10 @@ local _debugViolationDetected = false
 local _localModsChecked = false
 local _localModsActive  = false
 
+-- PZ Optimization instalado na pasta do jogo (v2.35.0): proibido no campeonato. A marca fica
+-- no ModData para sempre (PZCommunityRank_Pzopt): desinstalar depois nao limpa a run.
+local _pzoptActive = false
+
 -- True se o preset do desafio foi alterado (sandbox), independente de debug.
 -- Persiste via ModData (PZCommunityRank_PresetViolation, v2.31.0+). Separado da marca de
 -- debug para que a anistia de debug concedida pelo moderador nunca cubra sandbox alterado.
@@ -216,6 +220,22 @@ local function checkLocalMods(player)
     RankLog.warn("DESCLASSIFICADO: mod(s) fora da Oficina da Steam: " .. md["PZCommunityRank_LocalMods"])
 end
 
+-- Procura o PZ Optimization (RankModCheck.isPzoptInstalled) e grava no save, com a ultima hora
+-- de jogo em que foi visto (base da anistia). Quem desclassifica e o servidor, ao receber
+-- "pzopt=1" no codigo. Ele so muda com o jogo fechado, mas a checagem e barata: roda em todo
+-- ponto de verificacao para a hora acompanhar a run.
+local function checkPzopt(player)
+    if not player then return end
+    if not _pzoptActive then
+        if not RankModCheck.isPzoptInstalled() then return end
+        _pzoptActive = true
+        RankLog.warn("DESCLASSIFICADO: PZ Optimization instalado na pasta do jogo (proibido no campeonato).")
+    end
+    local md = player:getModData()
+    md["PZCommunityRank_Pzopt"]        = true
+    md["PZCommunityRank_PzoptSeenMin"] = survivedMinutes(player)
+end
+
 -- Retorna a string de motivo de desclassificacao por mod, incluindo a lista de IDs.
 -- Formato: "mods:NAO_PERMITIDO:id1,AUSENTE:id2" (maximo 10 entradas para nao inflar o codigo).
 -- Retorna "mods" se a lista nao estiver disponivel (violacao restaurada via ModData).
@@ -236,6 +256,8 @@ end
 --   "gap=<n>@<at>":  possivel sessao sem o mod - aviso ao moderador, nao desclassifica
 --   "local_mods=<ids>": mods fora da Oficina - o servidor desclassifica (v2.33.0)
 --   "local_min=<n>":  ultima hora de jogo (min) com esses mods - base da anistia
+--   "pzopt=1":        PZ Optimization instalado - o servidor desclassifica (v2.35.0)
+--   "pzopt_min=<n>":  ultima hora de jogo (min) com ele - base da anistia
 local function buildReasonExtra(player)
     local extra = {}
     if _debugViolationDetected then
@@ -259,6 +281,15 @@ local function buildReasonExtra(player)
         end
         extra[#extra + 1] = "local_mods=" .. localMods
         extra[#extra + 1] = "local_min=" .. math.floor(md["PZCommunityRank_LocalSeenMin"])
+    end)
+    pcall(function()
+        local md = player:getModData()
+        if not md["PZCommunityRank_Pzopt"] then return end
+        if not md["PZCommunityRank_PzoptSeenMin"] then
+            md["PZCommunityRank_PzoptSeenMin"] = survivedMinutes(player)
+        end
+        extra[#extra + 1] = "pzopt=1"
+        extra[#extra + 1] = "pzopt_min=" .. math.floor(md["PZCommunityRank_PzoptSeenMin"])
     end)
     return table.concat(extra, "&")
 end
@@ -287,6 +318,7 @@ local function triggerRank(player, playerIndex, isDead, deathCause)
     pcall(function() checkDebugMode(player) end)
     pcall(function() checkModViolation(player) end)
     pcall(function() checkLocalMods(player) end)
+    pcall(function() checkPzopt(player) end)
 
     -- Valida sandbox: desclassificacao por preset alterado tem prioridade sobre check pontual.
     local sandboxOk = true
@@ -500,6 +532,7 @@ local function onGameStart()
     _modViolationDetected     = false
     _localModsChecked         = false
     _localModsActive          = false
+    _pzoptActive              = false
     _modGap                   = nil
     _lootedBldCache     = {}
     _sleepLocCache      = {}
@@ -595,6 +628,7 @@ local function onGameStart()
                 if p2 then
                     checkDebugMode(p2)
                     checkLocalMods(p2)
+                    checkPzopt(p2)
                 end
             end)
 
@@ -1719,6 +1753,7 @@ pcall(function()
             pcall(function() checkDebugMode(p2) end)
             pcall(function() checkModViolation(p2) end)
             pcall(function() checkLocalMods(p2) end)
+            pcall(function() checkPzopt(p2) end)
             pcall(function() checkAndDisqualify(p2) end)
         else
             pcall(function() RankSandbox.check(false) end)
@@ -1992,6 +2027,7 @@ pcall(function()
             pcall(function() checkDebugMode(p2) end)
             pcall(function() checkModViolation(p2) end)
             pcall(function() checkLocalMods(p2) end)
+            pcall(function() checkPzopt(p2) end)
             pcall(function() checkAndDisqualify(p2) end)
         end
         safeSilentUpdate(player, 0)
@@ -2031,6 +2067,7 @@ Events.OnTick.Add(function()
         pcall(function() checkDebugMode(capturedPlayer) end)
         pcall(function() checkModViolation(capturedPlayer) end)
         pcall(function() checkLocalMods(capturedPlayer) end)
+        pcall(function() checkPzopt(capturedPlayer) end)
         local presetOk = false
         pcall(function() presetOk = checkAndDisqualify(capturedPlayer) end)
         if not presetOk then
@@ -2077,4 +2114,4 @@ pcall(function()
     RankLog.info("ISPostDeathUI: patch instalado - botao Criar Novo Personagem desabilitado no desafio.")
 end)
 
-RankLog.info("Mod carregado - B42.20 | v2.32.1")
+RankLog.info("Mod carregado - B42.20 | v2.35.0")
